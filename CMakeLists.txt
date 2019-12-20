@@ -22,6 +22,10 @@ option(CLAM_INCLUDE_TRANSFORMS OFF)
 # Save old CMAKE_FIND_LIBRARY_SUFFIXES
 set(_CLAM_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
+# Boost 1.72
+#SET(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} "/home/numair/Videos/boost_1_72_0")
+#SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} "/home/numair/Videos/boost_1_72_0/stage/lib")
+
 # determine if this is top-level or embedded project
 if (PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
   set(TopLevel TRUE)
