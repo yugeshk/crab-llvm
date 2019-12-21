@@ -260,11 +260,15 @@ def parseArgs(argv):
                           "- oct: octagons domain\n"
                           "- pk: polyhedra domain\n"
                           "- rtz: reduced product of term-dis-int with zones\n"
-                          "- w-int: wrapped intervals\n",
+                          "- w-int: wrapped intervals\n"
+                          "- bool: flat boolean domain\n",
                     choices=['int', 'ric', 'term-int',
                              'dis-int', 'term-dis-int', 'boxes',  
                              'zones', 'oct', 'pk', 'rtz',
-                             'w-int'],
+                             'w-int', 'as-int', 'as-ric', 'as-term-int', 
+                             'as-dis-int', 'as-term-dis-int', 'as-boxes', 
+                             'as-zones', 'as-oct', 'as-pk', 'as-rtz',
+                             'as-w-int','bool'],
                     dest='crab_dom', default='zones')
     p.add_argument('--crab-widening-delay', 
                     type=int, dest='widening_delay', 

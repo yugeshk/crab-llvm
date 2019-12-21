@@ -370,6 +370,8 @@ namespace clam {
   static std::string dom_to_str(CrabDomain dom) {
     switch (dom) {
     case INTERVALS:             return interval_domain_t::getDomainName();
+    case TERMS_INTERVALS:       return term_int_domain_t::getDomainName();
+    case BOOLEAN:               return boolean_domain_t::getDomainName();
     case INTERVALS_CONGRUENCES: return ric_domain_t::getDomainName();
     case BOXES:                 return boxes_domain_t::getDomainName();
     case DIS_INTERVALS:         return dis_interval_domain_t::getDomainName();
@@ -379,6 +381,17 @@ namespace clam {
     case OCT:                   return oct_domain_t::getDomainName();
     case PK:                    return pk_domain_t::getDomainName();
     case WRAPPED_INTERVALS:     return wrapped_interval_domain_t::getDomainName();
+    case ARRAYSMASHING_INTERVALS:             return arraySmashing_interval_domain_t::getDomainName(); 
+    case ARRAYSMASHING_INTERVALS_CONGRUENCES: return arraySmashing_ric_domain_t::getDomainName();
+    case ARRAYSMASHING_BOXES:                 return arraySmashing_boxes_domain_t::getDomainName();
+    case ARRAYSMASHING_DIS_INTERVALS:         return arraySmashing_dis_interval_domain_t::getDomainName();
+    case ARRAYSMASHING_ZONES_SPLIT_DBM:       return arraySmashing_split_dbm_domain_t::getDomainName();
+    case ARRAYSMASHING_TERMS_DIS_INTERVALS:   return arraySmashing_term_dis_int_domain_t::getDomainName();
+    case ARRAYSMASHING_TERMS_ZONES:           return arraySmashing_num_domain_t::getDomainName();
+    case ARRAYSMASHING_OCT:                   return arraySmashing_oct_domain_t::getDomainName();
+    case ARRAYSMASHING_PK:                    return arraySmashing_pk_domain_t::getDomainName();
+    case ARRAYSMASHING_WRAPPED_INTERVALS:     return arraySmashing_wrapped_interval_domain_t::getDomainName();
+    case ARRAYSMASHING_TERMS_INTERVALS:       return arraySmashing_term_int_domain_t::getDomainName();
     default:                    return "none";
     }
   }
@@ -718,20 +731,31 @@ namespace clam {
     // Domains used for intra-procedural analysis
     const std::map<CrabDomain, intra_analysis> intra_analyses {
       {
-	ZONES_SPLIT_DBM         , { bind_this(this, &IntraClam_Impl::analyzeCfg<split_dbm_domain_t>), "zones" }}	
+    	ZONES_SPLIT_DBM         , { bind_this(this, &IntraClam_Impl::analyzeCfg<split_dbm_domain_t>), "zones" }}	
+      , { ARRAYSMASHING_ZONES_SPLIT_DBM       , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_split_dbm_domain_t>), "array smashing zones" }}
       #ifdef HAVE_ALL_DOMAINS	
       , { INTERVALS_CONGRUENCES , { bind_this(this, &IntraClam_Impl::analyzeCfg<ric_domain_t>), "reduced product of intervals and congruences" }}
+      , { ARRAYSMASHING_INTERVALS_CONGRUENCES , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_ric_domain_t>), "array smashingreduced product of intervals and congruences" }}
+      , { BOOLEAN               , { bind_this(this, &IntraClam_Impl::analyzeCfg<boolean_domain_t>), "boolean" } }
       , { DIS_INTERVALS         , { bind_this(this, &IntraClam_Impl::analyzeCfg<dis_interval_domain_t>), "disjunctive intervals" }}
+      , { ARRAYSMASHING_DIS_INTERVALS         , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_dis_interval_domain_t>), "array smashing disjunctive intervals" }}
       , { TERMS_INTERVALS       , { bind_this(this, &IntraClam_Impl::analyzeCfg<term_int_domain_t>), "terms with intervals" }}
+      , { ARRAYSMASHING_TERMS_INTERVALS       , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_term_int_domain_t>), "array smashing terms with intervals" }}
       , { WRAPPED_INTERVALS     , { bind_this(this, &IntraClam_Impl::analyzeCfg<wrapped_interval_domain_t>), "wrapped intervals" }}
+      , { ARRAYSMASHING_WRAPPED_INTERVALS     , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_wrapped_interval_domain_t>), "array smashing wrapped intervals" }}
       , { TERMS_ZONES           , { bind_this(this, &IntraClam_Impl::analyzeCfg<num_domain_t>), "terms with zones" }}
+      , { ARRAYSMASHING_TERMS_ZONES         , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_num_domain_t>), "array smashing terms with zones" }}
       , { TERMS_DIS_INTERVALS   , { bind_this(this, &IntraClam_Impl::analyzeCfg<term_dis_int_domain_t>), "terms with disjunctive intervals" }}
+      , { ARRAYSMASHING_TERMS_DIS_INTERVALS   , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_term_dis_int_domain_t>), "array smashing terms with disjunctive intervals" }}
       , { OCT                   , { bind_this(this, &IntraClam_Impl::analyzeCfg<oct_domain_t>), "octagons" }}
+      , { ARRAYSMASHING_OCT     , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_oct_domain_t>), "array smashing octagons" }}
       , { BOXES                 , { bind_this(this, &IntraClam_Impl::analyzeCfg<boxes_domain_t>), "boxes" }}
+      , { ARRAYSMASHING_BOXES   , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_boxes_domain_t>), "array smashing boxes" }}
       , { PK                    , { bind_this(this, &IntraClam_Impl::analyzeCfg<pk_domain_t>), "polyhedra" }}
-      , { INTERVALS             , { bind_this(this, &IntraClam_Impl::analyzeCfg<interval_domain_t>), "classical intervals" }} 	
-      #endif 	
-      
+      , { ARRAYSMASHING_PK      , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_pk_domain_t>), "array smashing polyhedra" }}
+      , { INTERVALS             , { bind_this(this, &IntraClam_Impl::analyzeCfg<interval_domain_t>), "classical intervals" }}
+      , { ARRAYSMASHING_INTERVALS , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_interval_domain_t>), "array smashing classical intervals" } } 	
+      #endif 	 
     };
 
 
@@ -1102,9 +1126,14 @@ namespace clam {
       #ifdef HAVE_INTER
       {{ZONES_SPLIT_DBM, ZONES_SPLIT_DBM},
 	  { bind_this(this, &InterClam_Impl::analyzeCg<split_dbm_domain_t, split_dbm_domain_t>), "bottom-up:zones, top-down:zones" }}
+    , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_ZONES_SPLIT_DBM},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_split_dbm_domain_t>), "bottom-up:zones, top-down:zones" }}
+
       #ifdef HAVE_ALL_DOMAINS
       , {{ZONES_SPLIT_DBM, INTERVALS},
-	  { bind_this(this, &InterClam_Impl::analyzeCg<split_dbm_domain_t, interval_domain_t>), "bottom-up:zones, top-down:intervals" }}
+    { bind_this(this, &InterClam_Impl::analyzeCg<split_dbm_domain_t, interval_domain_t>), "bottom-up:zones, top-down:intervals" }}
+      , {{ZONES_SPLIT_DBM, BOOLEAN},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<split_dbm_domain_t, boolean_domain_t>), "bottom-up:zones, top-down:boolean" }}
       , {{ZONES_SPLIT_DBM, WRAPPED_INTERVALS},
 	  { bind_this(this, &InterClam_Impl::analyzeCg<split_dbm_domain_t, wrapped_interval_domain_t>), "bottom-up:zones, top-down:wrapped intervals" }}
       , {{ZONES_SPLIT_DBM, OCT},
@@ -1133,6 +1162,38 @@ namespace clam {
 	  { bind_this(this, &InterClam_Impl::analyzeCg<oct_domain_t, num_domain_t>), "bottom-up:oct, top-down:terms+zones" }}
       , {{OCT, TERMS_DIS_INTERVALS},
 	  { bind_this(this, &InterClam_Impl::analyzeCg<oct_domain_t, term_dis_int_domain_t>), "bottom-up:oct, top-down:terms+dis_intervals" }}
+    ,{{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_INTERVALS},
+	 { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_interval_domain_t>), "bottom-up:zones, top-down:intervals" }}
+      , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_WRAPPED_INTERVALS},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_wrapped_interval_domain_t>), "bottom-up:zones, top-down:wrapped intervals" }}
+      , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_ZONES_SPLIT_DBM},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_split_dbm_domain_t>), "bottom-up:zones, top-down:zones" }}
+      , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_BOXES},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_boxes_domain_t>), "bottom-up:zones, top-down:boxes" }}
+      , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_OCT},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_oct_domain_t>), "bottom-up:zones, top-down:oct" }}
+      , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_PK},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_pk_domain_t>), "bottom-up:zones, top-down:pk" }}
+      , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_TERMS_ZONES},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_num_domain_t>), "bottom-up:zones, top-down:terms+zones" }}
+      , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_TERMS_DIS_INTERVALS},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_term_dis_int_domain_t>), "bottom-up:zones, top-down:terms+dis_intervals" }}
+    , {{ARRAYSMASHING_OCT, ARRAYSMASHING_INTERVALS},
+	 { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_interval_domain_t>), "bottom-up:oct, top-down:intervals" }}
+      , {{ARRAYSMASHING_OCT, ARRAYSMASHING_WRAPPED_INTERVALS},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_wrapped_interval_domain_t>), "bottom-up:oct, top-down:wrapped intervals" }}
+      , {{ARRAYSMASHING_OCT, ARRAYSMASHING_ZONES_SPLIT_DBM},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_split_dbm_domain_t>), "bottom-up:oct, top-down:zones" }}
+      , {{ARRAYSMASHING_OCT, ARRAYSMASHING_BOXES},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_boxes_domain_t>), "bottom-up:oct, top-down:boxes" }}
+      , {{ARRAYSMASHING_OCT, ARRAYSMASHING_OCT},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_oct_domain_t>), "bottom-up:oct, top-down:oct" }}
+      , {{ARRAYSMASHING_OCT, ARRAYSMASHING_PK},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_pk_domain_t>), "bottom-up:oct, top-down:pk" }}
+      , {{ARRAYSMASHING_OCT, ARRAYSMASHING_TERMS_ZONES},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_num_domain_t>), "bottom-up:oct, top-down:terms+zones" }}
+      , {{ARRAYSMASHING_OCT, ARRAYSMASHING_TERMS_DIS_INTERVALS},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_oct_domain_t, arraySmashing_term_dis_int_domain_t>), "bottom-up:oct, top-down:terms+dis_intervals" }}
       #endif
       #endif 	
     };    
@@ -1300,6 +1361,7 @@ namespace clam {
       unsigned fun_counter = 1;
       for (auto &F : M) {
 	if (!CrabInter && isTrackable(F)) {
+    errs() << "###### optAI: Running the normal intra procedural analysis!";
 	  CRAB_VERBOSE_IF(1,
 			  crab::get_msg_stream() << "###Function "
 			  << fun_counter << "/" << num_analyzed_funcs << "###\n";);
