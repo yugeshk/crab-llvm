@@ -1,4 +1,5 @@
 # Clam: Crab for Llvm Abstraction Manager #
+<a href="https://travis-ci.org/seahorn/crab-llvm"><img src="https://travis-ci.org/seahorn/crab-llvm.svg?branch=master" title="Ubuntu 16.04 LTS 64bit, g++-5"/></a>
 
 # xxx Super Crab Additions xxx #
 
@@ -8,8 +9,11 @@
 * An optimization manager in the form of a python wrapper
 * Optimization Algorithms (rand, lattice rand, sim. annealing, hill climbing)
 
+< /br>
+< /br>
+< /br>
 
-<a href="https://travis-ci.org/seahorn/crab-llvm"><img src="https://travis-ci.org/seahorn/crab-llvm.svg?branch=master" title="Ubuntu 16.04 LTS 64bit, g++-5"/></a>
+
 
 <img src="https://upload.wikimedia.org/wikipedia/en/4/4c/LLVM_Logo.svg" alt="llvm logo" width=280 height=200 /><img src="http://i.imgur.com/IDKhq5h.png" alt="crab logo" width=280 height=200 /> 
 
