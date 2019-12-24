@@ -46,6 +46,7 @@
 #include "crab/checkers/assertion.hpp"
 //#include "crab/checkers/null.hpp"
 #include "crab/checkers/checker.hpp"
+#include "crab/transforms/lower_safe_assertions.hpp"
 #include "crab/cg/cg.hpp"
 #include "crab/cg/cg_bgl.hpp"
 #include "./crab/path_analyzer.hpp"
@@ -672,6 +673,15 @@ namespace clam {
 	//   prop.reset(new null_prop_t(params.check_verbose));
 	intra_checker_t checker(analyzer, {prop});
 	checker.run();
+  
+  // CFG TRANSFORMATION: Convert safe asserts into assumes
+  std::set<const cfg_t::statement_t*> safe_checks;
+  safe_checks.insert(prop->get_safe_checks().begin(),
+                     prop->get_safe_checks().end());
+  crab::transforms::lower_safe_assertions<cfg_t> lsa(safe_checks);
+  lsa.run(get_cfg());
+  // Transformation done
+
 	CRAB_VERBOSE_IF(1,
 			llvm::outs() << "Function " << m_fun.getName() << "\n";
 			checker.show(crab::outs()));
