@@ -673,7 +673,7 @@ namespace clam {
 	//   prop.reset(new null_prop_t(params.check_verbose));
 	intra_checker_t checker(analyzer, {prop});
 	checker.run();
-  
+
   // CFG TRANSFORMATION: Convert safe asserts into assumes
   std::set<const cfg_t::statement_t*> safe_checks;
   safe_checks.insert(prop->get_safe_checks().begin(),
@@ -1270,6 +1270,101 @@ namespace clam {
   /**
    * Begin ClamPass methods
    **/
+        /**
+        * Begin autoAI Methods
+        **/
+        void ClamPass::autoAI_IntraProcAnalysis(Module &M){
+          errs() << "\n###### optAI: Entered the intra procedural analyis core engine";
+          // Initializations
+          std::vector<std::tuple<CrabDomain, bool>> configuration;
+          CrabDomain domain1 = dom1;
+          CrabDomain domain2 = dom2;
+          CrabDomain domain3 = dom3;
+          bool backward1 = back1;
+          bool backward2 = back2;
+          bool backward3 = back3;
+          switch (domains)
+          {
+            case 1:
+              configuration.push_back(std::make_tuple(domain1, backward1));
+              break;
+
+            case 2:
+              configuration.push_back(std::make_tuple(domain1, backward1));
+              configuration.push_back(std::make_tuple(domain2, backward2));
+              break;
+            
+            case 3:
+              configuration.push_back(std::make_tuple(domain1, backward1));
+              configuration.push_back(std::make_tuple(domain2, backward2));
+              configuration.push_back(std::make_tuple(domain3, backward3));
+              break;
+
+            default:
+              errs() << "\n###### optAI: Number of given domains is not allowed in the current setting.";
+              break;
+          }
+
+          errs() << "\n###### optAI: Running the given configuration:";
+          clock_t begin = clock();
+          for(unsigned i=0; i < configuration.size(); i++){
+              errs() << "\n\tDomain:" << dom_to_str(std::get<0>(configuration[i])) << "   Backward:" << std::get<1>(configuration[i]);
+
+              /**
+               *  Setting crab parameters according to the given configuration 
+               */
+
+                m_params.dom = std::get<0>(configuration[i]);           // Intermediate-domain
+                m_params.run_backward = std::get<1>(configuration[i]);  // Intermediate-backward flag
+                // widening delay   // These are global and not changed, but they can be
+                // narrowing iterations   // These are global and not changed, but they can be
+                // widening threshold   // These are global and not changed, but they can be
+
+              // Running the domain on all the functions
+              unsigned num_analyzed_funcs = 0;
+              for (auto &F : M) {
+                  if (!isTrackable(F)) continue;
+                      num_analyzed_funcs++;
+              }
+            
+              m_checks_db.clear(); // Clear all previous results
+
+              unsigned fun_counter = 1;
+              for (auto &F : M) {
+	                if (!CrabInter && isTrackable(F)) {
+	                    ++fun_counter;
+	                    runOnFunction(F); 
+	                } 
+              }
+          }
+          clock_t end = clock();
+          // Finished running the configuration on all the functions in the Module
+
+          // Get the number of safe checks
+          unsigned total_safe = get_total_safe_checks();
+          errs() << "\n###### optAI: Total SAFE checks after running the configuration = " << total_safe;
+
+          // Get the number of warnings
+          unsigned total_warnings = get_total_warning_checks();
+          errs() << "\n###### optAI: Total WARNING checks after running the configuration = " << total_warnings;
+
+          // Get the time it took to run all the domains
+          float totalRunningTime = (1000 * float(end - begin)) / CLOCKS_PER_SEC; // milli seconds 
+          errs() << "\n###### optAI: Total Running time = " << totalRunningTime << " milli seconds";
+
+          // Save the results in a text file, that was pre-created by the python wrapper
+          errs() << "\n###### optAI: Temporary results path = " << resultPath ;
+          FILE *fp;
+          fp=fopen(resultPath.c_str(), "w");
+          fprintf(fp, "Warnings:%d\nRunningTime:%f", total_warnings, totalRunningTime);
+          fclose(fp);
+          errs() << "\n###### optAI: bye bye\n";
+        }
+
+        /**
+        * autoAI methods end
+        **/
+
   ClamPass::ClamPass()
     : llvm::ModulePass(ID), 
     m_mem(new DummyHeapAbstraction()),
@@ -1363,23 +1458,36 @@ namespace clam {
       CLAM_WARNING("running clam without memory analysis");
     }
 
+
+    if(autoAI){
+      errs() << "\n ************* autoAI analysis enabled ************* \n";
+      autoAI_IntraProcAnalysis(M);
+    } else {
+      errs() << "\n ************* autoAI analysis NOT enabled ********** \n";
+    }
+
+
+
+    // Normal inter procedural analysis
     if (CrabInter){
       InterClam_Impl inter_crab(M, *m_mem, *m_tli, *m_cfg_builder_man);
       AnalysisResults results = { m_pre_map, m_post_map, m_infeasible_edges, m_checks_db};
       inter_crab.Analyze(m_params, assumption_map_t(), results);
-    } else {
+    }
+    
+    // Normal intra-procedural analysis
+    if (!CrabInter && !autoAI) {
+      errs() << "###### optAI: Running the normal intra procedural analysis!";
       unsigned fun_counter = 1;
       for (auto &F : M) {
-	if (!CrabInter && isTrackable(F)) {
-    errs() << "###### optAI: Running the normal intra procedural analysis!";
-	  CRAB_VERBOSE_IF(1,
-			  crab::get_msg_stream() << "###Function "
-			  << fun_counter << "/" << num_analyzed_funcs << "###\n";);
-	  ++fun_counter;
-	  runOnFunction(F); 
-	}
+	        if (!CrabInter && isTrackable(F)) {
+	            CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "###Function " << fun_counter << "/" << num_analyzed_funcs << "###\n";);
+	            ++fun_counter;
+	            runOnFunction(F); 
+	        }
       }
     }
+
 
     if (CrabStats) {
       crab::CrabStats::PrintBrunch(crab::outs());

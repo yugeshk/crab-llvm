@@ -393,6 +393,12 @@ namespace clam {
     unsigned get_total_warning_checks() const;
     
     void print_checks(llvm::raw_ostream &o) const;
+
+    // Begin autoAI methods
+
+    void autoAI_IntraProcAnalysis(llvm::Module &M);
+    
+
   };
 
 } // end namespace 
