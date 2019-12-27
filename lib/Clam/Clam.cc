@@ -1275,6 +1275,13 @@ namespace clam {
         **/
         void ClamPass::autoAI_IntraProcAnalysis(Module &M){
           errs() << "\n###### optAI: Entered the intra procedural analyis core engine";
+          errs() << "\n###### optAI: Creating the results file with initial values";
+          FILE *fp;
+          fp=fopen(resultPath.c_str(), "w");
+          fprintf(fp, "Warnings:%d\nRunningTime:%f", 1000, 1000000);
+          fclose(fp);
+
+
           // Initializations
           std::vector<std::tuple<CrabDomain, bool>> configuration;
           CrabDomain domain1 = dom1;
