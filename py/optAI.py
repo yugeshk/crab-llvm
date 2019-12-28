@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import random
 from random import randint
 import sets
 import math
@@ -91,37 +92,13 @@ def random_sampling():
 
 
 def dars():
-    def get_addition_candidate_domains(currentConfiguration):
-        """
-            Given a configuration, return a set of possible next domains,
-            that respect the lattice
-            ALGORITHM:
-                <1> : union of all incomparable elements in the current configuration
-                <2> : union of all comparable elements in the current configuration
-                <3> : union of <2> and current configuration
-                <4> : difference of <1> and <3>
-        """
-        # <1>
-        incomp_union = []
-        for element in currentConfiguration:
-            incomp_union = sets.set_union(incomp_union, sets.all_incomparable_elements[element])
-        # <2>
-        comp_union = []
-        for element in currentConfiguration:
-            comp_union = sets.set_union(comp_union, sets.all_comparable_elements[element])
-        # <3>
-        union_comparable_and_current_configuraiton = sets.set_union(comp_union, currentConfiguration)
-        # <4>
-        candidate_domains = sets.set_difference(incomp_union, union_comparable_and_current_configuraiton)
-        return candidate_domains
-
     print("######### optAI.py: Optimization strategy = LATTICE RANDOM")
     parameters = dict()
     number_of_domains = randint(1,3)
     list_of_domains = []
     list_of_domains.append(sets.array_normalizer[USABLE_LIST_OF_DOMAINS[randint(0, len(USABLE_LIST_OF_DOMAINS)-1)]])
     for i in range(1, number_of_domains):
-        candidate_domains = get_addition_candidate_domains(list_of_domains)
+        candidate_domains = sets.get_addition_candidate_domains(list_of_domains)
         if len(candidate_domains) > 0:
             list_of_domains.append(candidate_domains[randint(0, len(candidate_domains) - 1)])
 
@@ -150,6 +127,10 @@ def dars():
     parameters["narr_iter"] = NARROWING_ITERATIONS[randint(0, len(NARROWING_ITERATIONS)-1)]
     parameters["wid_jump_set"] = WIDENING_JUMP_SETS[randint(0, len(WIDENING_JUMP_SETS)-1)]
 
+    print("######### optAI.py: Widening delay = " + str(parameters["wid_delay"]))
+    print("######### optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
+    print("######### optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
+
     # some sanity checks
     if len(list_of_domains) == 1 :
         assert(parameters["dom1"] is not None)
@@ -163,6 +144,134 @@ def dars():
 
     return parameters
 
+
+
+
+def mutation_algorithm(previous_configuration, onlyModifyDomains):
+    """
+        Simulated annealing optimization algorithm
+    """
+    # First get the list of domains. This i the only thing we care about in a config
+    print("######### optAI.py: Optimization strategy = SIMULATED ANNEALING")
+    successful_mutation  = False
+    new_configuration = []
+    # Extract only domains
+    if onlyModifyDomains:
+        # Array normalize the domains
+        if previous_configuration["dom1"] != None:
+            new_configuration.append(sets.array_normalizer[previous_configuration["dom1"]])
+        if previous_configuration["dom2"] != None:
+            new_configuration.append(sets.array_normalizer[previous_configuration["dom2"]])    
+        if previous_configuration["dom3"] != None:
+            new_configuration.append(sets.array_normalizer[previous_configuration["dom3"]])
+    else:
+        if previous_configuration["dom1"] != None:
+            new_configuration.append(previous_configuration["dom1"])
+        if previous_configuration["dom2"] != None:
+            new_configuration.append(previous_configuration["dom2"])    
+        if previous_configuration["dom3"] != None:
+            new_configuration.append(previous_configuration["dom3"])
+
+
+    while(not successful_mutation and onlyModifyDomains):
+        # Decide an action: 20% addition, 80% modification
+        action_pool = [1,2,2,2] # 1:add, 2:modification
+        action = action_pool[randint(0, len(action_pool) - 1)]
+        if action == 1 and len(new_configuration) < 3 :
+            # ADDTION
+            # add the LEAST IN-COMPARABLE DOMAIN
+            print("######### optAI.py: addition action chosen")
+            candidate_domains = sets.get_addition_candidate_domains_for_mutation_algo(new_configuration)
+            if len(candidate_domains) > 0:
+                new_configuration.append(candidate_domains[randint(0, len(candidate_domains) - 1)])
+                successful_mutation = True
+        else:
+            # Modificaiton
+            print("######### optAI.py: modification action chosen")
+            # First decide a modification location
+            mod_loc = randint(0, len(new_configuration) - 1)
+            print("######### optAI.py: mod location = " + str(mod_loc))
+            # Decide a sub-action: 
+            # 1: higher in the lattice  50%
+            # 2: lower in the lattice   30%
+            # 3: some least incomparable    20%
+            sub_action_pool = [1,1,1,1,1,2,2,2,3,3]
+            sub_action = sub_action_pool[randint(0, len(sub_action_pool)-1)]
+            candidate_domains = []
+            if sub_action == 1:
+                print("######### optAI.py: sub-action = [1] one step higher comparable in the lattice")
+                candidate_domains = sets.one_step_higher_comparable_elements[new_configuration[mod_loc]]
+                # Take difference from the current configuraiton
+                candidate_domains = sets.set_difference(candidate_domains, new_configuration)
+            if sub_action == 2: 
+                print("######### optAI.py: sub-action = [2] one step lower comparable in the lattice")
+                candidate_domains = sets.one_step_lower_comparable_elements[new_configuration[mod_loc]]
+                # Take difference from the current configuraiton
+                candidate_domains = sets.set_difference(candidate_domains, new_configuration)
+                # Check that the candidate_domains set does not contain an element that is lower_comaprable to any
+                # element in new_configuration   
+                lower_comparable_union = sets.get_lower_comparable_domains(new_configuration)
+                candidate_domains = sets.set_difference(candidate_domains, lower_comparable_union)
+            if sub_action == 3:
+                print("######### optAI.py: sub-action = [3] least íncomparable")
+                candidate_domains = sets.get_addition_candidate_domains_for_mutation_algo(new_configuration)
+            if len(candidate_domains) > 0 :
+                new_configuration[mod_loc] = candidate_domains[randint(0, len(candidate_domains) - 1)]
+                successful_mutation = True
+
+    parameters = dict()
+    parameters["domains"] = len(new_configuration)
+    parameters["back1"] = previous_configuration["back1"]
+    parameters["back2"] = previous_configuration["back2"]
+    parameters["back3"] = previous_configuration["back3"]
+    parameters["wid_delay"] = previous_configuration["wid_delay"]
+    parameters["narr_iter"] = previous_configuration["narr_iter"]
+    parameters["wid_jump_set"] = previous_configuration["wid_jump_set"]
+
+    # Mutate global + local parameters
+    if(not onlyModifyDomains):
+        # Random Array Flipping
+        for i in range(0, len(new_configuration) - 1) :
+            new_configuration[i] = new_configuration[i] if randint(0,1) == 0 else sets.array_flip[new_configuration[i]]
+        parameters["back1"] = randint(0,1)
+        parameters["back2"] = randint(0,1)
+        parameters["back3"] = randint(0,1)
+        parameters["wid_delay"] = WIDENING_DELAYS[randint(0, len(WIDENING_DELAYS)-1)]
+        parameters["narr_iter"] = NARROWING_ITERATIONS[randint(0, len(NARROWING_ITERATIONS)-1)]
+        parameters["wid_jump_set"] = WIDENING_JUMP_SETS[randint(0, len(WIDENING_JUMP_SETS)-1)]
+
+    parameters["dom1"] = new_configuration[0]
+    if len(new_configuration) > 1:
+        parameters["dom2"] = new_configuration[1]
+    else:
+        parameters["dom2"] = None
+    if len(new_configuration) > 2:
+        parameters["dom3"] = new_configuration[2]
+    else:
+        parameters["dom3"] = None
+
+    print("######### optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
+    print("######### optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
+    print("######### optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
+
+    print("######### optAI.py: Widening delay = " + str(parameters["wid_delay"]))
+    print("######### optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
+    print("######### optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
+
+    # some sanity checks
+    if len(new_configuration) == 1 :
+        assert(parameters["dom1"] is not None)
+    if len(new_configuration) == 2 :
+        assert(parameters["dom1"] is not None)
+        assert(parameters["dom2"] is not None)
+    if len(new_configuration) == 3 :
+        assert(parameters["dom1"] is not None)
+        assert(parameters["dom2"] is not None)
+        assert(parameters["dom3"] is not None)
+
+    return parameters
+
+
 def hill_climbing():
     optAI_flags = ""
     print("NOT YET IMPLEMENTED")
@@ -170,25 +279,12 @@ def hill_climbing():
 
 
 
-
-def simulated_annealing():
-    """
-        Simulated annealing optimization algorithm
-    """
-
-    optAI_flags = ""
-    return optAI_flags
-
-
-
-
 def baysian_optimization():
     """
-    TODO: maybe use ROBO ?
+    TODO: maybe use ROBO.py ?
     """
-    optAI_flags = ""
     print("NOT YET IMPLEMENTED")
-    return optAI_flags
+    return {"domains" : 0}
 
 
 
@@ -196,15 +292,15 @@ def baysian_optimization():
 
 
 ##############################
-############## Util fFunctions
+############## Util Functions
 
 
 def initial_configuration():
     inital_configuration = {
         "domains" : 1,
-        "dom1" : "bool",
+        "dom1" : "pk",
         "dom2" : None,
-        "dom2" : None,
+        "dom3" : None,
         "back1" : 0,
         "back2" : 0,
         "back3" : 0,
@@ -242,42 +338,89 @@ def get_cost(run_command, input_file_path, timeout):
     
     warnings = None
     time = None
+    total_assertions = None
     for line in lines:
         if line.find("Warnings:") != -1:
             warnings = line.replace("Warnings:", "")
         if line.find("RunningTime:") != -1:
             time = line.replace("RunningTime:", "") # This time is in milli seconds
+        if line.find("TotalAssertions:") != -1:
+            total_assertions = line.replace("TotalAssertions:", "")
+
+   
+    assert(warnings is not None)
+    assert(time is not None)
+    assert(total_assertions is not None)
 
     print("######### optAI.py: WARNINGS = " + warnings)
     print("######### optAI.py: TIME = " + time + " MILLI-SECONDS") # This time is in milli seconds
+    print("######### optAI.py: TOTAL ASSERTIONS = " + total_assertions)
 
     # delete the temporary results file
     os.system("rm -rf " + actual_results_file_path)
 
 
-    # compute cost
-    assert(warnings is not None)
-    assert(time is not None)
+    # Compute cost
     
     #Convert time out to milli seconds
     timeout = float(timeout) * 1000
     warnings = float(warnings)
     time = float(time)
+    total_assertions = float(total_assertions)
+
+    if total_assertions == 0:
+        print("######### optAI.py: TOTAL ASSERTIONS = 0. NO ASSERTIONS FOUND IN THIS PROGRAM")
+        return 0
 
     if time > timeout:
         cost = math.inf
     else:
         boostingFactor = 1000
-        cost = (boostingFactor / warnings) * (warnings + (time/timeout))
+        cost = (boostingFactor / total_assertions) * (warnings + (time/timeout))
 
-        #TODO: GET TOTAL NUMBER OF WARNINGS TO COMPUTE COST
-
-
-
+    print("######### optAI.py: COST of the configuration = " + str(cost))
+    return cost
 
 
 
+def acceptance_probability(previousConfigCost, newConfigurationCost, NumberOfSteps):
+    """
+        e = previous config
+        e' = new config
+        T = NumberOfSteps
 
+        *  Implementation of P(e, e', T).
+        *  The probability of making a transition from the current state s
+        *  to a candidate state s' is specified by the acceptance probability P().
+        *  e  ==> getCost(s)
+        *  e' ==> getCost(s')
+        *  T  ==> Temperature      [number of steps/iterations in our setting].
+        * 
+        * s and s' are configurations in our setting.
+        * 
+        * According to the kirkpatrick 1983 paper:
+        *   P(e, e', T) =  1                            if e' < e
+        *                  exp( -(e' - e) / T )      otherwise
+        */
+    """
+    if newConfigurationCost < previousConfigCost:
+        return 1
+    else:
+        acceptance_prob = pow(2.7, -(newConfigurationCost - previousConfigCost) / NumberOfSteps)
+        return acceptance_prob
+    
+
+
+def accept_configuration(optimizationAlgorithm, acceptanceProb):
+    if optimizationAlgorithm == "sa":
+        random_bw_0_1 = random.random()
+        if acceptanceProb  >= random_bw_0_1:
+            return True
+        else:
+            return False
+    else:
+        # everything else
+        return True
 
 
 ############## Util functions end
@@ -313,41 +456,84 @@ def main():
 
 
     # Intialize variables   
-    run_command = ""
     timeout_kill = "timeout " + timeout + "s "
     dir_path = os.path.dirname(os.path.realpath(__file__)).replace("/py", "")
     path_to_clamPy = os.path.join(dir_path, "build", "_DIR_", "bin", "clam.py")
     basic_clam_flags = " --crab-check=assert --crab-do-not-print-invariants"
 
     # Inital run command    
-    run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + path_to_c_file
+    prefix_run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + path_to_c_file
 
 
 
 
+    # Initializations before the optimization loop
+    initial_optAI_flag = synthesize_optAI_flags(initial_configuration())
+    initial_run_command = prefix_run_command + initial_optAI_flag
+    initial_cost = get_cost(initial_run_command, path_to_c_file, timeout)
+    previous_config_cost = initial_cost
+    previous_configuration = initial_configuration()
+    new_configuration = previous_configuration
+    best_cost = initial_cost
+    best_config = initial_configuration()
 
 
-    # get configuration
-    if optimizationAlgorithm == "rs":
-        configuration = random_sampling()
-    if optimizationAlgorithm == "dars":
-        configuration = dars()
-    if optimizationAlgorithm == "sa":
-        configuration= simulated_annealing()
-    if optimizationAlgorithm == "hc":
-        configuration = hill_climbing()
-    if optimizationAlgorithm == "bo":
-        configuration = baysian_optimization()
+    # Start optimization loop
+    for loop_step in range(50,0,-1):
+        # get configuration
+        print("***********************************")
+        print("***********************************")
+        print("***********************************")
+        print("***********************************")
+        print("***********************************")
+        print("****** OPTIMIZATION LOOP " + str(loop_step) + " ********")
+        print("***********************************")
+        print("***********************************")
+        print("***********************************")
+        print("***********************************")
+        print("***********************************")
+        if optimizationAlgorithm == "rs":
+            configuration = random_sampling()
+
+        if optimizationAlgorithm == "dars":
+            configuration = dars()
+
+        if optimizationAlgorithm == "sa":
+            onlyModifyDomains = True if loop_step >= 5 else False
+            new_configuration= mutation_algorithm(previous_configuration, onlyModifyDomains)
+        
+        if optimizationAlgorithm == "hc":
+            configuration = hill_climbing()
+
+        if optimizationAlgorithm == "bo":
+            configuration = baysian_optimization()
+       
+
+        optAI_flags = synthesize_optAI_flags(new_configuration)
+        run_command = prefix_run_command + optAI_flags
+
+        #run_command without result_path
+        new_configuration_cost =  get_cost(run_command, path_to_c_file, timeout)       
+        acceptanceProb = acceptance_probability(previous_config_cost, new_configuration_cost, loop_step)
+        # Decide whether to accept the configuraiton or not
+        if accept_configuration(optimizationAlgorithm, acceptanceProb):
+            previous_configuration = new_configuration
+            previous_config_cost = new_configuration_cost
+            # Best configuration
+            if new_configuration_cost < best_cost:
+                best_cost = new_configuration_cost
+                best_config = new_configuration
+    
+    
+    print("######### optAI.py: BEST CONFIGURATION ")
+    print(best_config["dom1"] + " " + str(best_config["back1"]))
+    print(str(best_config["dom2"]) + " " + str(best_config["back2"]))
+    print(str(best_config["dom3"]) + " " + str(best_config["back3"]))
+    print("best cost = " + str(best_cost))
+    print("intial cost = " + str(initial_cost))
 
 
 
-
-    optAI_flags = synthesize_optAI_flags(configuration)
-    run_command = run_command + optAI_flags
-
-
-    # run_command without result_path
-    get_cost(run_command, path_to_c_file, timeout)
 
 
 if __name__ == '__main__':

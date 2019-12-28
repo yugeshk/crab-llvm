@@ -1276,11 +1276,12 @@ namespace clam {
         void ClamPass::autoAI_IntraProcAnalysis(Module &M){
           errs() << "\n###### optAI: Entered the intra procedural analyis core engine";
           errs() << "\n###### optAI: Creating the results file with initial values";
+
+          // Creating the results file with initial values for warnings and time
           FILE *fp;
           fp=fopen(resultPath.c_str(), "w");
-          fprintf(fp, "Warnings:%d\nRunningTime:%f", 1000, 1000000);
+          fprintf(fp, "Warnings:%d\nRunningTime:%f", 1000, 10000000);
           fclose(fp);
-
 
           // Initializations
           std::vector<std::tuple<CrabDomain, bool>> configuration;
@@ -1355,16 +1356,25 @@ namespace clam {
           unsigned total_warnings = get_total_warning_checks();
           errs() << "\n###### optAI: Total WARNING checks after running the configuration = " << total_warnings;
 
+          // Get total unsafe checks
+          unsigned total_unsafe = get_total_error_checks();
+          errs() << "\n###### optAI: Total unsafe checks after running the configuraiton = " << total_unsafe;
+
+          // Total number of checks/assertions in the program
+          unsigned total_checks = get_total_checks();
+          errs() << "\n###### optAI: Total number of checks (safe + warnings + unsafe)= " << total_checks;
+          assert(total_safe + total_warnings + total_unsafe == total_checks);
+
           // Get the time it took to run all the domains
           float totalRunningTime = (1000 * float(end - begin)) / CLOCKS_PER_SEC; // milli seconds 
           errs() << "\n###### optAI: Total Running time = " << totalRunningTime << " milli seconds";
 
           // Save the results in a text file, that was pre-created by the python wrapper
           errs() << "\n###### optAI: Temporary results path = " << resultPath ;
-          FILE *fp;
-          fp=fopen(resultPath.c_str(), "w");
-          fprintf(fp, "Warnings:%d\nRunningTime:%f", total_warnings, totalRunningTime);
-          fclose(fp);
+          FILE *fp2;
+          fp2=fopen(resultPath.c_str(), "w");
+          fprintf(fp2, "Warnings:%d\nRunningTime:%f\nTotalAssertions:%d", total_warnings, totalRunningTime, total_safe + total_warnings + total_unsafe);
+          fclose(fp2);
           errs() << "\n###### optAI: bye bye\n";
         }
 
