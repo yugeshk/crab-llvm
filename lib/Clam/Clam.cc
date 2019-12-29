@@ -1280,7 +1280,7 @@ namespace clam {
           // Creating the results file with initial values for warnings and time
           FILE *fp;
           fp=fopen(resultPath.c_str(), "w");
-          fprintf(fp, "Warnings:%d\nRunningTime:%f", 1000, 10000000);
+          fprintf(fp, "Warnings:TIMEOUT\nRunningTime:TIMEOUT");
           fclose(fp);
 
           // Initializations
@@ -1313,6 +1313,13 @@ namespace clam {
               break;
           }
 
+
+          // Get the number of safe checks
+          unsigned total_safe = 0;
+
+          errs() << "\n###### optAI: Total SAFE checks after running the configuration = " << total_safe;
+
+
           errs() << "\n###### optAI: Running the given configuration:";
           clock_t begin = clock();
           for(unsigned i=0; i < configuration.size(); i++){
@@ -1344,13 +1351,14 @@ namespace clam {
 	                    runOnFunction(F); 
 	                } 
               }
+
+              // Get the number of safe checks
+              total_safe = total_safe + get_total_safe_checks();
+              errs() << "\n###### optAI: total safe till now: " << total_safe ;
           }
           clock_t end = clock();
           // Finished running the configuration on all the functions in the Module
-
-          // Get the number of safe checks
-          unsigned total_safe = get_total_safe_checks();
-          errs() << "\n###### optAI: Total SAFE checks after running the configuration = " << total_safe;
+  
 
           // Get the number of warnings
           unsigned total_warnings = get_total_warning_checks();
@@ -1362,9 +1370,8 @@ namespace clam {
 
           // Total number of checks/assertions in the program
           unsigned total_checks = get_total_checks();
-          errs() << "\n###### optAI: Total number of checks (safe + warnings + unsafe)= " << total_checks;
-          assert(total_safe + total_warnings + total_unsafe == total_checks);
-
+          errs() << "\n###### optAI: Total number of checks (safe + warnings + unsafe)= " << total_safe + total_unsafe + total_warnings;
+        
           // Get the time it took to run all the domains
           float totalRunningTime = (1000 * float(end - begin)) / CLOCKS_PER_SEC; // milli seconds 
           errs() << "\n###### optAI: Total Running time = " << totalRunningTime << " milli seconds";

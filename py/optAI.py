@@ -26,6 +26,9 @@ def argument_parser():
     parser.add_argument('--inputFile', help="path to input C file")
     parser.add_argument('--optAlgo', help="Optimization Algorithm")
     parser.add_argument('--timeOut', help="Time out")
+    parser.add_argument('--benchmarkFolder', help="Path to benchmark folder")
+    parser.add_argument('--iterations', help="number of optimization iterations")
+    parser.add_argument('--debug', help="debug mode")
     args = vars(parser.parse_args())
     return args
 
@@ -67,10 +70,10 @@ def random_sampling():
     """
     parameters = dict()
     
-    print("######### optAI.py: Optimization strategy = Random Sampling")
+    print("################## optAI.py: Optimization strategy = Random Sampling")
     number_of_domains = randint(1,3)
     parameters["domains"] = number_of_domains
-    print("######### optAI.py: Number of domains selected = " + str(number_of_domains))
+    print("################## optAI.py: Number of domains selected = " + str(number_of_domains))
     parameters["dom1"] = USABLE_LIST_OF_DOMAINS[randint(0, len(USABLE_LIST_OF_DOMAINS)-1)]
     parameters["dom2"] = USABLE_LIST_OF_DOMAINS[randint(0, len(USABLE_LIST_OF_DOMAINS)-1)] if number_of_domains > 1 else None
     parameters["dom3"] = USABLE_LIST_OF_DOMAINS[randint(0, len(USABLE_LIST_OF_DOMAINS)-1)] if number_of_domains > 2 else None
@@ -81,18 +84,18 @@ def random_sampling():
     parameters["narr_iter"] = NARROWING_ITERATIONS[randint(0, len(NARROWING_ITERATIONS)-1)]
     parameters["wid_jump_set"] = WIDENING_JUMP_SETS[randint(0, len(WIDENING_JUMP_SETS)-1)]
 
-    print("######### optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
-    print("######### optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
-    print("######### optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
-    print("######### optAI.py: Widening delay = " + str(parameters["wid_delay"]))
-    print("######### optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
-    print("######### optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
+    print("################## optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
+    print("################## optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
+    print("################## optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
+    print("################## optAI.py: Widening delay = " + str(parameters["wid_delay"]))
+    print("################## optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
+    print("################## optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
 
     return parameters
 
 
 def dars():
-    print("######### optAI.py: Optimization strategy = LATTICE RANDOM")
+    print("################## optAI.py: Optimization strategy = LATTICE RANDOM")
     parameters = dict()
     number_of_domains = randint(1,3)
     list_of_domains = []
@@ -113,23 +116,23 @@ def dars():
     else:
         parameters["dom3"] = None
 
-    print("######### optAI.py: Number of domains selected = " + str(number_of_domains))
-    print("######### optAI.py: Number of domains we got = " + str(len(list_of_domains)))
+    print("################## optAI.py: Number of domains selected = " + str(number_of_domains))
+    print("################## optAI.py: Number of domains we got = " + str(len(list_of_domains)))
     parameters["domains"] = len(list_of_domains)
     parameters["back1"] = randint(0,1)
     parameters["back2"] = randint(0,1)
     parameters["back3"] = randint(0,1)
-    print("######### optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
-    print("######### optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
-    print("######### optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
+    print("################## optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
+    print("################## optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
+    print("################## optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
 
     parameters["wid_delay"] = WIDENING_DELAYS[randint(0, len(WIDENING_DELAYS)-1)]
     parameters["narr_iter"] = NARROWING_ITERATIONS[randint(0, len(NARROWING_ITERATIONS)-1)]
     parameters["wid_jump_set"] = WIDENING_JUMP_SETS[randint(0, len(WIDENING_JUMP_SETS)-1)]
 
-    print("######### optAI.py: Widening delay = " + str(parameters["wid_delay"]))
-    print("######### optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
-    print("######### optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
+    print("################## optAI.py: Widening delay = " + str(parameters["wid_delay"]))
+    print("################## optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
+    print("################## optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
 
     # some sanity checks
     if len(list_of_domains) == 1 :
@@ -152,7 +155,7 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
         Simulated annealing optimization algorithm
     """
     # First get the list of domains. This i the only thing we care about in a config
-    print("######### optAI.py: Optimization strategy = SIMULATED ANNEALING")
+    print("################## optAI.py: Optimization strategy = SIMULATED ANNEALING")
     successful_mutation  = False
     new_configuration = []
     # Extract only domains
@@ -180,17 +183,17 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
         if action == 1 and len(new_configuration) < 3 :
             # ADDTION
             # add the LEAST IN-COMPARABLE DOMAIN
-            print("######### optAI.py: addition action chosen")
+            print("################## optAI.py: addition action chosen")
             candidate_domains = sets.get_addition_candidate_domains_for_mutation_algo(new_configuration)
             if len(candidate_domains) > 0:
                 new_configuration.append(candidate_domains[randint(0, len(candidate_domains) - 1)])
                 successful_mutation = True
         else:
             # Modificaiton
-            print("######### optAI.py: modification action chosen")
+            print("################## optAI.py: modification action chosen")
             # First decide a modification location
             mod_loc = randint(0, len(new_configuration) - 1)
-            print("######### optAI.py: mod location = " + str(mod_loc))
+            print("################## optAI.py: mod location = " + str(mod_loc))
             # Decide a sub-action: 
             # 1: higher in the lattice  50%
             # 2: lower in the lattice   30%
@@ -199,12 +202,12 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
             sub_action = sub_action_pool[randint(0, len(sub_action_pool)-1)]
             candidate_domains = []
             if sub_action == 1:
-                print("######### optAI.py: sub-action = [1] one step higher comparable in the lattice")
+                print("################## optAI.py: sub-action = [1] one step higher comparable in the lattice")
                 candidate_domains = sets.one_step_higher_comparable_elements[new_configuration[mod_loc]]
                 # Take difference from the current configuraiton
                 candidate_domains = sets.set_difference(candidate_domains, new_configuration)
             if sub_action == 2: 
-                print("######### optAI.py: sub-action = [2] one step lower comparable in the lattice")
+                print("################## optAI.py: sub-action = [2] one step lower comparable in the lattice")
                 candidate_domains = sets.one_step_lower_comparable_elements[new_configuration[mod_loc]]
                 # Take difference from the current configuraiton
                 candidate_domains = sets.set_difference(candidate_domains, new_configuration)
@@ -213,7 +216,7 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
                 lower_comparable_union = sets.get_lower_comparable_domains(new_configuration)
                 candidate_domains = sets.set_difference(candidate_domains, lower_comparable_union)
             if sub_action == 3:
-                print("######### optAI.py: sub-action = [3] least íncomparable")
+                print("################## optAI.py: sub-action = [3] least íncomparable")
                 candidate_domains = sets.get_addition_candidate_domains_for_mutation_algo(new_configuration)
             if len(candidate_domains) > 0 :
                 new_configuration[mod_loc] = candidate_domains[randint(0, len(candidate_domains) - 1)]
@@ -250,13 +253,13 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
     else:
         parameters["dom3"] = None
 
-    print("######### optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
-    print("######### optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
-    print("######### optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
+    print("################## optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
+    print("################## optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
+    print("################## optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
 
-    print("######### optAI.py: Widening delay = " + str(parameters["wid_delay"]))
-    print("######### optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
-    print("######### optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
+    print("################## optAI.py: Widening delay = " + str(parameters["wid_delay"]))
+    print("################## optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
+    print("################## optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
 
     # some sanity checks
     if len(new_configuration) == 1 :
@@ -298,10 +301,10 @@ def baysian_optimization():
 def initial_configuration():
     inital_configuration = {
         "domains" : 1,
-        "dom1" : "pk",
+        "dom1" : "bool",
         "dom2" : None,
         "dom3" : None,
-        "back1" : 0,
+        "back1" : 1,
         "back2" : 0,
         "back3" : 0,
         "wid_delay" : 1,
@@ -322,7 +325,7 @@ def get_cost(run_command, input_file_path, timeout):
     result_file_path = " --resultPath='" + actual_results_file_path + "'"
     run_command = run_command + result_file_path
 
-    print("######### optAI.py: Sythesized Command: " + run_command)
+    print("################## optAI.py: Sythesized Command: " + run_command)
     os.system(run_command)
 
 
@@ -332,9 +335,9 @@ def get_cost(run_command, input_file_path, timeout):
         with open(actual_results_file_path, 'r') as f:
             lines = f.read().splitlines()
     except Exception as e:
-        print("######### optAI.py: Error while opening results file")
+        print("################## optAI.py: Error while opening results file")
         print(e)
-        return 0
+        return 0,0,0,0
     
     warnings = None
     time = None
@@ -347,15 +350,17 @@ def get_cost(run_command, input_file_path, timeout):
         if line.find("TotalAssertions:") != -1:
             total_assertions = line.replace("TotalAssertions:", "")
 
-   
-    assert(warnings is not None)
-    assert(time is not None)
-    assert(total_assertions is not None)
 
-    print("######### optAI.py: WARNINGS = " + warnings)
-    print("######### optAI.py: TIME = " + time + " MILLI-SECONDS") # This time is in milli seconds
-    print("######### optAI.py: TOTAL ASSERTIONS = " + total_assertions)
+    # DO NOT COMPUTE COST IF THE FILE TIMED OUT !
+    if warnings == "TIMEOUT":
+        print("THE CONFIGURATION TIMED OUT")        
+        return "timeout"
 
+    print("################## optAI.py: WARNINGS = " + warnings)
+    print("################## optAI.py: SAFE = " + str(int(total_assertions) - int(warnings)))
+    print("################## optAI.py: TOTAL ASSERTIONS = " + total_assertions)
+    print("################## optAI.py: TIME = " + time + " MILLI-SECONDS") # This time is in milli seconds
+    
     # delete the temporary results file
     os.system("rm -rf " + actual_results_file_path)
 
@@ -369,8 +374,8 @@ def get_cost(run_command, input_file_path, timeout):
     total_assertions = float(total_assertions)
 
     if total_assertions == 0:
-        print("######### optAI.py: TOTAL ASSERTIONS = 0. NO ASSERTIONS FOUND IN THIS PROGRAM")
-        return 0
+        print("################## optAI.py: TOTAL ASSERTIONS = 0. NO ASSERTIONS FOUND IN THIS PROGRAM")
+        return 0,0,0,0
 
     if time > timeout:
         cost = math.inf
@@ -378,8 +383,8 @@ def get_cost(run_command, input_file_path, timeout):
         boostingFactor = 1000
         cost = (boostingFactor / total_assertions) * (warnings + (time/timeout))
 
-    print("######### optAI.py: COST of the configuration = " + str(cost))
-    return cost
+    print("################## optAI.py: COST of the configuration = " + str(cost))
+    return cost, warnings, time, total_assertions
 
 
 
@@ -423,6 +428,32 @@ def accept_configuration(optimizationAlgorithm, acceptanceProb):
         return True
 
 
+def export_data(export_file_path, file, total_assertions, best_safe, best_warnings, best_time, best_cost, best_config):
+
+    print("################## optAI.py: EXPORTING RESULT: " + export_file_path)
+    if not os.path.exists(export_file_path):
+        f = open(export_file_path, "a+")
+        f.write("File_path,safe,warnings,time(ms),cost,wd,nar iter, wd j set, dom1, dom2, dom3\n")
+        f.close()
+    f = open(export_file_path, "a+")
+    f.write(file + ",")   # file_path
+    f.write(str(best_safe) + ",") # best safe
+    f.write(str(best_warnings) + ",") # best warnings 
+    f.write(str(best_time) + ",") # best time
+    f.write(str(best_cost) + ",") # best cost
+    f.write(str(best_config["wid_delay"]) + ",") # best wd
+    f.write(str(best_config["narr_iter"]) + ",") # best narr iter
+    f.write(str(best_config["wid_jump_set"]) + ",") # best wd j set
+    f.write(str(best_config["dom1"]) + "<<" +str(best_config["back1"]) + ">>,") # domain  1
+    if best_config["dom2"] is not None:
+        f.write(str(best_config["dom2"]) + "<<" +str(best_config["back2"]) + ">>,") # domain  2
+    if best_config["dom3"] is not None:
+        f.write(str(best_config["dom3"]) + "<<" +str(best_config["back3"]) + ">>,") # domain  1
+    f.write("\n")
+    f.close()
+
+
+
 ############## Util functions end
 #################################
 
@@ -441,8 +472,11 @@ def main():
     path_to_c_file = args["inputFile"]
     optimizationAlgorithm = args["optAlgo"]
     timeout = args["timeOut"]
+    path_to_benchmark_folder = args["benchmarkFolder"]
+    optimization_iterations = args["iterations"]
 
-    if path_to_c_file is None:
+
+    if path_to_c_file is None and path_to_benchmark_folder is None:
         print("PLEASE ENTER PATH TO INPUT C FILE [--inputFile]")
         return 1
     
@@ -454,88 +488,154 @@ def main():
         print("PLEASE PROVIDE TIMEOUT [--timeOut]")
         return 1
 
+    if optimization_iterations is None:
+        print("PLEASE NUMBER OF ITERATIONS FOR OPTIMIZATION [--iterations]")
+        return 1
 
-    # Intialize variables   
-    timeout_kill = "timeout " + timeout + "s "
-    dir_path = os.path.dirname(os.path.realpath(__file__)).replace("/py", "")
-    path_to_clamPy = os.path.join(dir_path, "build", "_DIR_", "bin", "clam.py")
-    basic_clam_flags = " --crab-check=assert --crab-do-not-print-invariants"
+    list_of_files = []
+    if path_to_benchmark_folder is not None:
+        # extract all the files in this folder. 
+        # r=root, d=directories, f = files
+        for r, d, f in os.walk(path_to_benchmark_folder):
+            for file in f:
+                list_of_files.append(os.path.join(r, file))
+        print("loaded " + str(len(list_of_files)) + " files in memory")
+        for i in list_of_files:
+            print(i)
+    
+    export_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), optimizationAlgorithm + ".csv")
 
-    # Inital run command    
-    prefix_run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + path_to_c_file
-
-
-
-
-    # Initializations before the optimization loop
-    initial_optAI_flag = synthesize_optAI_flags(initial_configuration())
-    initial_run_command = prefix_run_command + initial_optAI_flag
-    initial_cost = get_cost(initial_run_command, path_to_c_file, timeout)
-    previous_config_cost = initial_cost
-    previous_configuration = initial_configuration()
-    new_configuration = previous_configuration
-    best_cost = initial_cost
-    best_config = initial_configuration()
-
-
-    # Start optimization loop
-    for loop_step in range(50,0,-1):
-        # get configuration
-        print("***********************************")
-        print("***********************************")
-        print("***********************************")
-        print("***********************************")
-        print("***********************************")
-        print("****** OPTIMIZATION LOOP " + str(loop_step) + " ********")
-        print("***********************************")
-        print("***********************************")
-        print("***********************************")
-        print("***********************************")
-        print("***********************************")
-        if optimizationAlgorithm == "rs":
-            configuration = random_sampling()
-
-        if optimizationAlgorithm == "dars":
-            configuration = dars()
-
-        if optimizationAlgorithm == "sa":
-            onlyModifyDomains = True if loop_step >= 5 else False
-            new_configuration= mutation_algorithm(previous_configuration, onlyModifyDomains)
+    file_counter = 0
+    for file in list_of_files:
+        file_counter += 1
+        # Intialize variables   
+        timeout_kill = "timeout " + timeout + "s "
+        dir_path = os.path.dirname(os.path.realpath(__file__)).replace("/py", "")
+        path_to_clamPy = os.path.join(dir_path, "build", "_DIR_", "bin", "clam.py")
+        basic_clam_flags = " --crab-check=assert --crab-do-not-print-invariants --crab-disable-warnings --crab-track=arr --crab-singleton-aliases"
+        basic_clam_flags = basic_clam_flags + " --crab-heap-analysis=cs-sea-dsa --crab-do-not-store-invariants --devirt-functions=types --externalize-addr-taken-functions"
+        basic_clam_flags = basic_clam_flags + " --lower-select --lower-unsigned-icmp" 
+        # basic_clam_flags = basic_clam_flags + " -O3"  DO NOT USE THIS!
         
-        if optimizationAlgorithm == "hc":
-            configuration = hill_climbing()
+        
+        
+        # Inital run command    
+        prefix_run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + file
 
-        if optimizationAlgorithm == "bo":
-            configuration = baysian_optimization()
-       
+        # Initializations before the optimization loop
+        initial_optAI_flag = synthesize_optAI_flags(initial_configuration())
+        initial_run_command = prefix_run_command + initial_optAI_flag
+        initial_cost = get_cost(initial_run_command, file, timeout)
+        previous_config_cost = float(initial_cost[0])
+        previous_configuration = initial_configuration()
+        new_configuration = previous_configuration
+        best_cost = float(initial_cost[0])
+        best_config = initial_configuration()
+        best_warnings = 0
+        best_time = 0
+        total_assertions = 0
+        best_safe = 0
 
-        optAI_flags = synthesize_optAI_flags(new_configuration)
-        run_command = prefix_run_command + optAI_flags
-
-        #run_command without result_path
-        new_configuration_cost =  get_cost(run_command, path_to_c_file, timeout)       
-        acceptanceProb = acceptance_probability(previous_config_cost, new_configuration_cost, loop_step)
-        # Decide whether to accept the configuraiton or not
-        if accept_configuration(optimizationAlgorithm, acceptanceProb):
-            previous_configuration = new_configuration
-            previous_config_cost = new_configuration_cost
-            # Best configuration
-            if new_configuration_cost < best_cost:
-                best_cost = new_configuration_cost
-                best_config = new_configuration
-    
-    
-    print("######### optAI.py: BEST CONFIGURATION ")
-    print(best_config["dom1"] + " " + str(best_config["back1"]))
-    print(str(best_config["dom2"]) + " " + str(best_config["back2"]))
-    print(str(best_config["dom3"]) + " " + str(best_config["back3"]))
-    print("best cost = " + str(best_cost))
-    print("intial cost = " + str(initial_cost))
+        if initial_cost[3] == 0:
+            print("NO ASSERTION FOUND IN THIS PROGRAM")
+            export_data(export_file_path, 0, 0, 0, 0, 0, initial_configuration)
+            continue
 
 
+        # Start optimization loop
+        for loop_step in range(int(optimization_iterations),1,-1):
+            # get configuration
+            print("***********************************")
+            print("***********************************")
+            print("***********************************")
+            print("***********************************")
+            print("***********************************")
+            print("****** Program: " + str(file_counter) + " ****************")
+            print("****** OPTIMIZATION LOOP " + str(loop_step) + " ********")
+            print("***********************************")
+            print("***********************************")
+            print("***********************************")
+            print("***********************************")
+            print("***********************************")
+            if optimizationAlgorithm == "rs":
+                new_configuration = random_sampling()
 
+            if optimizationAlgorithm == "dars":
+                new_configuration = dars()
+
+            if optimizationAlgorithm == "sa":
+                # Last 10 iterations only modify settings
+                onlyModifyDomains = True if loop_step >= 10 else False
+                new_configuration= mutation_algorithm(previous_configuration, onlyModifyDomains)
+            
+            if optimizationAlgorithm == "hc":
+                new_configuration = hill_climbing()
+
+            if optimizationAlgorithm == "bo":
+                new_configuration = baysian_optimization()
+        
+
+            optAI_flags = synthesize_optAI_flags(new_configuration)
+            run_command = prefix_run_command + optAI_flags
+
+            #run_command without result_path
+            run_results = get_cost(run_command, file, timeout)
+            if run_results == "timeout":
+                print("timeout!")
+                continue
+            new_configuration_cost = float(run_results[0])
+            warnings = run_results[1]
+            time = run_results[2]
+            total_assertions = run_results[3]
+            safe = total_assertions - warnings
+            
+
+
+            acceptanceProb = acceptance_probability(previous_config_cost, new_configuration_cost, loop_step)
+            # Decide whether to accept the configuraiton or not
+            if accept_configuration(optimizationAlgorithm, acceptanceProb):
+                previous_configuration = new_configuration
+                previous_config_cost = new_configuration_cost
+                # Best configuration
+                if new_configuration_cost < best_cost:
+                    best_cost = new_configuration_cost
+                    best_config = new_configuration
+                    best_warnings = warnings
+                    best_time = time
+                    best_safe = safe
+                    
+        
+        print("################## optAI.py: BEST CONFIGURATION ")
+        print(best_config["dom1"] + " " + str(best_config["back1"]))
+        print(str(best_config["dom2"]) + " " + str(best_config["back2"]))
+        print(str(best_config["dom3"]) + " " + str(best_config["back3"]))
+        print("best cost = " + str(best_cost))
+        print("intial cost = " + str(initial_cost))
+        print("best_warnings = " + str(best_warnings))
+        print("best_safe = " + str(best_safe))
+
+        # Export results
+        export_data(export_file_path, file, total_assertions, best_safe, best_warnings, best_time, best_cost, best_config)
 
 
 if __name__ == '__main__':
-    print("######### optAI.py: RANDOM SEED NOT SET")
+    print("################## optAI.py: RANDOM SEED NOT SET")
     main()
+
+
+
+
+"""
+How to use:
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks/" --optAlgo="sa" --timeOut=120 --iterations=50
+
+TODO:
+* Ready for big experiments.
+
+* Maybe we need a debugging mode.
+
+* Hill climbing
+
+* for one experiment, we need Jorge's orginal zones x bool domain (the expert domain)
+
+"""
