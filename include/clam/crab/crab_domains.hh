@@ -130,6 +130,12 @@ namespace clam {
 					    BASE(arraySmashing_split_dbm_domain_t),
 					    reduced_product_impl::term_dbm_params> BASE(arraySmashing_num_domain_t);
 
+
+  // EXPERT RECIPIE
+  /// -- Zones using sparse DBMs in split normal form (SAS'16)
+  typedef SplitDBM<number_t, varname_t> BASE(original_split_dbm_domain_t);
+
+
   //ARRAY_BOOL_NUM(interval_domain_t);
   //ARRAY_BOOL_NUM(split_dbm_domain_t);
   //ARRAY_BOOL_NUM(dis_interval_domain_t);
@@ -157,5 +163,8 @@ namespace clam {
   ARRAY_NUM(arraySmashing_num_domain_t);
   ARRAY_NUM(arraySmashing_wrapped_interval_domain_t);
   ARRAY_NUM(arraySmashing_boxes_domain_t);
+
+  // Original zones
+  ARRAY_BOOL_NUM(original_split_dbm_domain_t);
   
 } // end namespace crab-llvm

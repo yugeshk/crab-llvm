@@ -45,6 +45,7 @@ namespace llvm {
   DUMP_TO_LLVM_STREAM(clam::arraySmashing_boxes_domain_t)
   DUMP_TO_LLVM_STREAM(clam::arraySmashing_dis_interval_domain_t)
   DUMP_TO_LLVM_STREAM(clam::arraySmashing_num_domain_t)
+  DUMP_TO_LLVM_STREAM(clam::original_split_dbm_domain_t)
 
   template <typename DomInfo>
   inline llvm::raw_ostream& operator<<(llvm::raw_ostream& o, 
@@ -170,7 +171,7 @@ namespace clam {
 		   w_intv,
        as_intv, as_split_dbm, as_term_intv, as_term_dis_intv,
        as_ric, as_boxes, as_dis_intv, as_oct, as_pk, as_num,
-       as_w_intv} id_t;
+       as_w_intv, orig_zones} id_t;
     
     GenericAbsDomWrapper() { }
     
@@ -240,5 +241,7 @@ namespace clam {
    DEFINE_WRAPPER(ArraySmashingOctApronDomainWrapper,arraySmashing_oct_domain_t,as_oct)
    DEFINE_WRAPPER(ArraySmashingPkApronDomainWrapper,arraySmashing_pk_domain_t,as_pk)
    DEFINE_WRAPPER(ArraySmashingNumDomainWrapper,arraySmashing_num_domain_t,as_num)
+   DEFINE_WRAPPER(OriginalSDbmDomainWrapper,original_split_dbm_domain_t,orig_zones)
+
 
 } // end namespace clam

@@ -638,4 +638,12 @@ TODO:
 
 * for one experiment, we need Jorge's orginal zones x bool domain (the expert domain)
 
+* Result importing and parsing
+
+
+
+[FOR LATER]
+
+* add more domains, especially the cross product of boolean and a numerical domain (The original domains in crab-llvm)
+
 """

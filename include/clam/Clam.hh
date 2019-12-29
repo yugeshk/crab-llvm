@@ -62,6 +62,7 @@ namespace clam {
        , ARRAYSMASHING_OCT
        , ARRAYSMASHING_PK
        , ARRAYSMASHING_WRAPPED_INTERVALS
+       , ORIGINAL_ZONES_SPLIT_DBM
      };
 
   ////

@@ -268,7 +268,7 @@ def parseArgs(argv):
                              'w-int', 'as-int', 'as-ric', 'as-term-int', 
                              'as-dis-int', 'as-term-dis-int', 'as-boxes', 
                              'as-zones', 'as-oct', 'as-pk', 'as-rtz',
-                             'as-w-int','bool'],
+                             'as-w-int','bool', 'orig-zones'],
                     dest='dom1', default='zones')
     p.add_argument('--dom2',
                     help="Choose abstract domain:\n"
@@ -290,7 +290,7 @@ def parseArgs(argv):
                              'w-int', 'as-int', 'as-ric', 'as-term-int', 
                              'as-dis-int', 'as-term-dis-int', 'as-boxes', 
                              'as-zones', 'as-oct', 'as-pk', 'as-rtz',
-                             'as-w-int','bool'],
+                             'as-w-int','bool', 'orig-zones'],
                     dest='dom2', default='zones')
     p.add_argument('--dom3',
                     help="Choose abstract domain:\n"
@@ -312,7 +312,7 @@ def parseArgs(argv):
                              'w-int', 'as-int', 'as-ric', 'as-term-int', 
                              'as-dis-int', 'as-term-dis-int', 'as-boxes', 
                              'as-zones', 'as-oct', 'as-pk', 'as-rtz',
-                             'as-w-int','bool'],
+                             'as-w-int','bool', 'orig-zones'],
                     dest='dom3', default='zones')
 
     p.add_argument('--domains',
@@ -367,7 +367,7 @@ def parseArgs(argv):
                              'w-int', 'as-int', 'as-ric', 'as-term-int', 
                              'as-dis-int', 'as-term-dis-int', 'as-boxes', 
                              'as-zones', 'as-oct', 'as-pk', 'as-rtz',
-                             'as-w-int','bool'],
+                             'as-w-int','bool', 'orig-zones'],
                     dest='crab_dom', default='zones')
     p.add_argument('--crab-widening-delay', 
                     type=int, dest='widening_delay', 

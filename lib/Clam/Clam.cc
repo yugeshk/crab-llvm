@@ -393,6 +393,7 @@ namespace clam {
     case ARRAYSMASHING_PK:                    return arraySmashing_pk_domain_t::getDomainName();
     case ARRAYSMASHING_WRAPPED_INTERVALS:     return arraySmashing_wrapped_interval_domain_t::getDomainName();
     case ARRAYSMASHING_TERMS_INTERVALS:       return arraySmashing_term_int_domain_t::getDomainName();
+    case ORIGINAL_ZONES_SPLIT_DBM:            return original_split_dbm_domain_t::getDomainName();
     default:                    return "none";
     }
   }
@@ -764,7 +765,8 @@ namespace clam {
       , { PK                    , { bind_this(this, &IntraClam_Impl::analyzeCfg<pk_domain_t>), "polyhedra" }}
       , { ARRAYSMASHING_PK      , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_pk_domain_t>), "array smashing polyhedra" }}
       , { INTERVALS             , { bind_this(this, &IntraClam_Impl::analyzeCfg<interval_domain_t>), "classical intervals" }}
-      , { ARRAYSMASHING_INTERVALS , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_interval_domain_t>), "array smashing classical intervals" } } 	
+      , { ARRAYSMASHING_INTERVALS , { bind_this(this, &IntraClam_Impl::analyzeCfg<arraySmashing_interval_domain_t>), "array smashing classical intervals" }}
+      , { ORIGINAL_ZONES_SPLIT_DBM , { bind_this(this, &IntraClam_Impl::analyzeCfg<original_split_dbm_domain_t>), "orignal zones domainw"}} 	
       #endif 	 
     };
 
@@ -1138,6 +1140,8 @@ namespace clam {
 	  { bind_this(this, &InterClam_Impl::analyzeCg<split_dbm_domain_t, split_dbm_domain_t>), "bottom-up:zones, top-down:zones" }}
     , {{ARRAYSMASHING_ZONES_SPLIT_DBM, ARRAYSMASHING_ZONES_SPLIT_DBM},
 	  { bind_this(this, &InterClam_Impl::analyzeCg<arraySmashing_split_dbm_domain_t, arraySmashing_split_dbm_domain_t>), "bottom-up:zones, top-down:zones" }}
+    , {{ORIGINAL_ZONES_SPLIT_DBM, ORIGINAL_ZONES_SPLIT_DBM},
+	  { bind_this(this, &InterClam_Impl::analyzeCg<original_split_dbm_domain_t, original_split_dbm_domain_t>), "bottom-up:origzones, top-down:origzones" }}
 
       #ifdef HAVE_ALL_DOMAINS
       , {{ZONES_SPLIT_DBM, INTERVALS},
