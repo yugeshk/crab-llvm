@@ -627,23 +627,81 @@ if __name__ == '__main__':
 
 """
 How to use:
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks/" --optAlgo="sa" --timeOut=120 --iterations=50
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="sa" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="sa" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="sa" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="sa" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="sa" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="sa" --timeOut=1 --iterations=40
+
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="rs" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="rs" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="rs" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="rs" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="rs" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="rs" --timeOut=1 --iterations=40
+
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="dars" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="dars" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="dars" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="dars" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="dars" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="dars" --timeOut=1 --iterations=40
+
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="hc" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="hc" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="hc" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="hc" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="hc" --timeOut=1 --iterations=40
+./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="hc" --timeOut=1 --iterations=40
+
 
 TODO:
 * Ready for big experiments.
-
 * Maybe we need a debugging mode.
-
 * Hill climbing
-
-* for one experiment, we need Jorge's orginal zones x bool domain (the expert domain)
-
 * Result importing and parsing
+
+
+[Experiments needed for the resubmission]
+* All 4 algorithms. 
+    (1 sec, 40 iterations)    -     (5 mins, 40 iterations)
+* All 4 algorithms.
+    (5 mins, 40 iterations)     -   (5 mins, 80 iterations)
+
+* Comparison with the most precise recipe. Do this for all or maybe some randomly selected programs.
+
+* Were the optimizations algorithms able to prove all the assertions that the expert recipie managed to prove ?
+
+
+So in total 3 experiments   -   4 algorithms
+
+
+Experiments:
+ 
+    ALGO                                            projected time          Actual Time
+    
+    RS      1sec, 40 iterations, 120 programs       80 mins
+    DARS    1sec, 40 iterations, 120 programs       80 mins
+    SA      1sec, 40 iterations, 120 programs       80 mins
+    HC      1sec, 40 iterations, 120 programs       80 mins
+
+
+    RS      5min, 40 iterations, 120 programs
+    DARS    5min, 40 iterations, 120 programs       
+    SA      5min, 40 iterations, 120 programs   
+    HC      5min, 40 iterations, 120 programs   
+
+
+    RS      5min, 80 iterations, 120 programs
+    DARS    5min, 80 iterations, 120 programs
+    SA      5min, 80 iterations, 120 programs
+    HC      5min, 80 iterations, 120 programs
+
 
 
 
 [FOR LATER]
-
 * add more domains, especially the cross product of boolean and a numerical domain (The original domains in crab-llvm)
 
 """
