@@ -360,7 +360,7 @@ def get_cost(run_command, input_file_path, timeout, algo):
     except Exception as e:
         print("################## optAI.py: Error while opening results file")
         print(e)
-        return 0,0,0,0
+        return "timeout","timeout", "timeout", "timeout"
     
     warnings = None
     time = None
@@ -554,19 +554,23 @@ def main():
         initial_optAI_flag = synthesize_optAI_flags(initial_configuration(), server)
         initial_run_command = intial_prefix_run_command + initial_optAI_flag
         initial_cost = get_cost(initial_run_command, file, timeout, optimizationAlgorithm)
-        # This can return timeout here
-        if initial_cost[0] == "timeout":
-            previous_config_cost = math.inf
-        else:
-            previous_config_cost = float(initial_cost[0])
-        previous_configuration = initial_configuration()
-        new_configuration = previous_configuration
-        best_cost = previous_config_cost
-        best_config = initial_configuration()
+        # This can return timeout here 
         best_warnings = 0
         best_time = 0
         total_assertions = 0
         best_safe = 0
+        if initial_cost[0] == "timeout":
+            previous_config_cost = math.inf
+        else:
+            previous_config_cost = float(initial_cost[0])
+            best_warnings = float(initial_cost[1])
+            best_time = float(initial_cost[2])
+
+        previous_configuration = initial_configuration()
+        new_configuration = previous_configuration
+        best_cost = previous_config_cost
+        best_config = initial_configuration()
+        
 
         if initial_cost[3] == 0:
             print("NO ASSERTION FOUND IN THIS PROGRAM")
