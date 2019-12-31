@@ -6,3 +6,4 @@
 /llvm-seahorn/
 /sea-dsa/
 .vscode/
+py/__pycache__/

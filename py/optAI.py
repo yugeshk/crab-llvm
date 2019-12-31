@@ -42,6 +42,15 @@ def synthesize_optAI_flags(parameters):
             Flags that are only accepted and processed by autoAI
     """
 
+    # ELINA PK BACKWARD ERROR
+    if parameters["dom1"] == "pk" or parameters["dom1"] == "as-pk":
+        parameters["back1"] == 0
+    if parameters["dom2"] == "pk" or parameters["dom2"] == "as-pk":
+        parameters["back2"] == 0
+    if parameters["dom3"] == "pk" or parameters["dom3"] == "as-pk":
+        parameters["back3"] == 0
+
+
     # Number of domains
     domains = " --domains=" + str(parameters["domains"])
     # domain names
@@ -275,11 +284,14 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
     return parameters
 
 
-def hill_climbing():
-    optAI_flags = ""
-    print("NOT YET IMPLEMENTED")
-    return optAI_flags
-
+def hill_climbing(previous_configuration, loop_step):
+    next_configuration = dict()
+    if loop_step % 10 == 0:
+        next_configuration = dars()
+    else:
+        onlyModifyDomains = True if loop_step >= 10 else False
+        next_configuration = mutation_algorithm(previous_configuration, onlyModifyDomains)
+    return next_configuration
 
 
 def baysian_optimization():
@@ -353,8 +365,9 @@ def get_cost(run_command, input_file_path, timeout):
 
     # DO NOT COMPUTE COST IF THE FILE TIMED OUT !
     if warnings == "TIMEOUT":
-        print("THE CONFIGURATION TIMED OUT")        
-        return "timeout"
+        print("THE CONFIGURATION TIMED OUT")
+        os.system("rm " + actual_results_file_path)        
+        return "timeout","timeout", "timeout", "timeout"
 
     print("################## optAI.py: WARNINGS = " + warnings)
     print("################## optAI.py: SAFE = " + str(int(total_assertions) - int(warnings)))
@@ -362,7 +375,7 @@ def get_cost(run_command, input_file_path, timeout):
     print("################## optAI.py: TIME = " + time + " MILLI-SECONDS") # This time is in milli seconds
     
     # delete the temporary results file
-    os.system("rm -rf " + actual_results_file_path)
+    os.system("rm " + actual_results_file_path)
 
 
     # Compute cost
@@ -375,6 +388,7 @@ def get_cost(run_command, input_file_path, timeout):
 
     if total_assertions == 0:
         print("################## optAI.py: TOTAL ASSERTIONS = 0. NO ASSERTIONS FOUND IN THIS PROGRAM")
+        os.system("rm " + actual_results_file_path)
         return 0,0,0,0
 
     if time > timeout:
@@ -492,6 +506,7 @@ def main():
         print("PLEASE NUMBER OF ITERATIONS FOR OPTIMIZATION [--iterations]")
         return 1
 
+
     list_of_files = []
     if path_to_benchmark_folder is not None:
         # extract all the files in this folder. 
@@ -502,6 +517,9 @@ def main():
         print("loaded " + str(len(list_of_files)) + " files in memory")
         for i in list_of_files:
             print(i)
+
+    if path_to_benchmark_folder is None and path_to_c_file is not None:
+        list_of_files.append(path_to_c_file)
     
     export_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), optimizationAlgorithm + ".csv")
 
@@ -515,9 +533,6 @@ def main():
         basic_clam_flags = " --crab-check=assert --crab-do-not-print-invariants --crab-disable-warnings --crab-track=arr --crab-singleton-aliases"
         basic_clam_flags = basic_clam_flags + " --crab-heap-analysis=cs-sea-dsa --crab-do-not-store-invariants --devirt-functions=types --externalize-addr-taken-functions"
         basic_clam_flags = basic_clam_flags + " --lower-select --lower-unsigned-icmp" 
-        # basic_clam_flags = basic_clam_flags + " -O3"  DO NOT USE THIS!
-        
-        
         
         # Inital run command    
         prefix_run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + file
@@ -526,10 +541,14 @@ def main():
         initial_optAI_flag = synthesize_optAI_flags(initial_configuration())
         initial_run_command = prefix_run_command + initial_optAI_flag
         initial_cost = get_cost(initial_run_command, file, timeout)
-        previous_config_cost = float(initial_cost[0])
+        # This can return timeout here
+        if initial_cost[0] == "timeout":
+            previous_config_cost = math.inf
+        else:
+            previous_config_cost = float(initial_cost[0])
         previous_configuration = initial_configuration()
         new_configuration = previous_configuration
-        best_cost = float(initial_cost[0])
+        best_cost = previous_config_cost
         best_config = initial_configuration()
         best_warnings = 0
         best_time = 0
@@ -538,9 +557,8 @@ def main():
 
         if initial_cost[3] == 0:
             print("NO ASSERTION FOUND IN THIS PROGRAM")
-            export_data(export_file_path, 0, 0, 0, 0, 0, initial_configuration)
+            export_data(export_file_path, file, 0, 0, 0, 0, 0, initial_configuration())
             continue
-
 
         # Start optimization loop
         for loop_step in range(int(optimization_iterations),1,-1):
@@ -569,7 +587,7 @@ def main():
                 new_configuration= mutation_algorithm(previous_configuration, onlyModifyDomains)
             
             if optimizationAlgorithm == "hc":
-                new_configuration = hill_climbing()
+                new_configuration = hill_climbing(previous_configuration, loop_step)
 
             if optimizationAlgorithm == "bo":
                 new_configuration = baysian_optimization()
@@ -580,7 +598,7 @@ def main():
 
             #run_command without result_path
             run_results = get_cost(run_command, file, timeout)
-            if run_results == "timeout":
+            if run_results[0] == "timeout":
                 print("timeout!")
                 continue
             new_configuration_cost = float(run_results[0])
@@ -680,11 +698,11 @@ So in total 3 experiments   -   4 algorithms
 Experiments:
  
     ALGO                                            projected time          Actual Time
-    
-    RS      1sec, 40 iterations, 120 programs       80 mins
-    DARS    1sec, 40 iterations, 120 programs       80 mins
-    SA      1sec, 40 iterations, 120 programs       80 mins
-    HC      1sec, 40 iterations, 120 programs       80 mins
+
+    RS      1sec, 40 iterations, 120 programs       
+    DARS    1sec, 40 iterations, 120 programs       
+    SA      1sec, 40 iterations, 120 programs       
+    HC      1sec, 40 iterations, 120 programs       
 
 
     RS      5min, 40 iterations, 120 programs
