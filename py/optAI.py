@@ -539,6 +539,7 @@ def main():
         file_counter += 1
         # Intialize variables   
         timeout_kill = "timeout " + timeout + "s "
+        inital_timeout_kill = "timeout 300s "
         dir_path = os.path.dirname(os.path.realpath(__file__)).replace("/py", "")
         path_to_clamPy = os.path.join(dir_path, "build", "_DIR_", "bin", "clam.py")
         basic_clam_flags = " --crab-check=assert --crab-do-not-print-invariants --crab-disable-warnings --crab-track=arr --crab-singleton-aliases"
@@ -547,10 +548,11 @@ def main():
         
         # Inital run command    
         prefix_run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + file
+        intial_prefix_run_command = inital_timeout_kill + path_to_clamPy + basic_clam_flags + " " + file
 
         # Initializations before the optimization loop
         initial_optAI_flag = synthesize_optAI_flags(initial_configuration(), server)
-        initial_run_command = prefix_run_command + initial_optAI_flag
+        initial_run_command = intial_prefix_run_command + initial_optAI_flag
         initial_cost = get_cost(initial_run_command, file, timeout, optimizationAlgorithm)
         # This can return timeout here
         if initial_cost[0] == "timeout":
