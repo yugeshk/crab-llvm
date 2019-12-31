@@ -337,13 +337,13 @@ def initial_configuration():
     return inital_configuration
 
 
-def get_cost(run_command, input_file_path, timeout):
+def get_cost(run_command, input_file_path, timeout, algo):
     """
         Run the final command and get the cost of the configuration
     """    
     input_file_path = input_file_path.replace("/", "_")
     input_file_path = input_file_path.replace(".", "_")
-    result_file_name = input_file_path + ".txt"
+    result_file_name = input_file_path + "_" + algo + ".txt"
     actual_results_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), result_file_name)
     result_file_path = " --resultPath='" + actual_results_file_path + "'"
     run_command = run_command + result_file_path
@@ -551,7 +551,7 @@ def main():
         # Initializations before the optimization loop
         initial_optAI_flag = synthesize_optAI_flags(initial_configuration(), server)
         initial_run_command = prefix_run_command + initial_optAI_flag
-        initial_cost = get_cost(initial_run_command, file, timeout)
+        initial_cost = get_cost(initial_run_command, file, timeout, optimizationAlgorithm)
         # This can return timeout here
         if initial_cost[0] == "timeout":
             previous_config_cost = math.inf
@@ -608,7 +608,7 @@ def main():
             run_command = prefix_run_command + optAI_flags
 
             #run_command without result_path
-            run_results = get_cost(run_command, file, timeout)
+            run_results = get_cost(run_command, file, timeout, optimizationAlgorithm)
             if run_results[0] == "timeout":
                 print("timeout!")
                 continue
