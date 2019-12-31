@@ -29,12 +29,13 @@ def argument_parser():
     parser.add_argument('--benchmarkFolder', help="Path to benchmark folder")
     parser.add_argument('--iterations', help="number of optimization iterations")
     parser.add_argument('--debug', help="debug mode")
+    parser.add_argument('--server', help="server")
     args = vars(parser.parse_args())
     return args
 
 
 
-def synthesize_optAI_flags(parameters):
+def synthesize_optAI_flags(parameters, server):
     """
         inputs:
             parameters: dict()
@@ -44,12 +45,22 @@ def synthesize_optAI_flags(parameters):
 
     # ELINA PK BACKWARD ERROR
     if parameters["dom1"] == "pk" or parameters["dom1"] == "as-pk":
-        parameters["back1"] == 0
+        parameters["back1"] = 0
     if parameters["dom2"] == "pk" or parameters["dom2"] == "as-pk":
-        parameters["back2"] == 0
+        parameters["back2"] = 0
     if parameters["dom3"] == "pk" or parameters["dom3"] == "as-pk":
-        parameters["back3"] == 0
+        parameters["back3"] = 0
 
+    # Boxes
+    if server is not None:
+        # We are running on a server
+        if parameters["dom1"] == "boxes" or parameters["dom1"] == "as-boxes":
+            parameters["dom1"] = "bool"
+        if parameters["dom2"] == "boxes" or parameters["dom2"] == "as-boxes":
+            parameters["dom2"] = "bool"
+        if parameters["dom3"] == "boxes" or parameters["dom3"] == "as-boxes":
+            parameters["dom3"] = "bool"
+    
 
     # Number of domains
     domains = " --domains=" + str(parameters["domains"])
@@ -488,7 +499,7 @@ def main():
     timeout = args["timeOut"]
     path_to_benchmark_folder = args["benchmarkFolder"]
     optimization_iterations = args["iterations"]
-
+    server = args["server"]
 
     if path_to_c_file is None and path_to_benchmark_folder is None:
         print("PLEASE ENTER PATH TO INPUT C FILE [--inputFile]")
@@ -538,7 +549,7 @@ def main():
         prefix_run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + file
 
         # Initializations before the optimization loop
-        initial_optAI_flag = synthesize_optAI_flags(initial_configuration())
+        initial_optAI_flag = synthesize_optAI_flags(initial_configuration(), server)
         initial_run_command = prefix_run_command + initial_optAI_flag
         initial_cost = get_cost(initial_run_command, file, timeout)
         # This can return timeout here
@@ -593,7 +604,7 @@ def main():
                 new_configuration = baysian_optimization()
         
 
-            optAI_flags = synthesize_optAI_flags(new_configuration)
+            optAI_flags = synthesize_optAI_flags(new_configuration, server)
             run_command = prefix_run_command + optAI_flags
 
             #run_command without result_path
