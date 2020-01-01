@@ -1279,6 +1279,7 @@ namespace clam {
         **/
         void ClamPass::autoAI_IntraProcAnalysis(Module &M){
           errs() << "\n###### optAI: Entered the intra procedural analyis core engine";
+          errs() << "\n###### optAI: version 01.01.20";
           errs() << "\n###### optAI: Creating the results file with initial values";
 
           // Creating the results file with initial values for warnings and time

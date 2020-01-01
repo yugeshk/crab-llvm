@@ -7,3 +7,7 @@
 /sea-dsa/
 .vscode/
 py/__pycache__/
+py/dars.csv
+py/hc.csv
+py/rs.csv
+py/sa.csv
