@@ -30,6 +30,7 @@ def argument_parser():
     parser.add_argument('--iterations', help="number of optimization iterations")
     parser.add_argument('--debug', help="debug mode")
     parser.add_argument('--server', help="server")
+    parser.add_argument('--seed', help="random seed")
     args = vars(parser.parse_args())
     return args
 
@@ -500,6 +501,7 @@ def main():
     path_to_benchmark_folder = args["benchmarkFolder"]
     optimization_iterations = args["iterations"]
     server = args["server"]
+    seed = args["seed"]
 
     if path_to_c_file is None and path_to_benchmark_folder is None:
         print("PLEASE ENTER PATH TO INPUT C FILE [--inputFile]")
@@ -517,6 +519,13 @@ def main():
         print("PLEASE NUMBER OF ITERATIONS FOR OPTIMIZATION [--iterations]")
         return 1
 
+    if seed is None:
+        seed = 42
+    else:
+        seed = int(seed)
+
+
+    random.seed(seed)
 
     list_of_files = []
     if path_to_benchmark_folder is not None:
