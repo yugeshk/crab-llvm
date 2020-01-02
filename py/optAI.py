@@ -455,12 +455,12 @@ def accept_configuration(optimizationAlgorithm, acceptanceProb):
         return True
 
 
-def export_data(export_file_path, file, total_assertions, best_safe, best_warnings, best_time, best_cost, best_config, best_iteration, total_iteration_time):
+def export_data(export_file_path, file, total_assertions, best_safe, best_warnings, best_time, best_cost, best_config, best_iteration, total_iteration_time, time_to_best_iteration):
 
     print("################## optAI.py: EXPORTING RESULT: " + export_file_path)
     if not os.path.exists(export_file_path):
         f = open(export_file_path, "a+")
-        f.write("File_path,safe,warnings,time(ms),cost,best_iteration,total_iteration_time,wd,nar iter, wd j set, dom1, dom2, dom3\n")
+        f.write("File_path,safe,warnings,time(ms),cost,best_iteration,total_iteration_time,time_to_best_iteration, wd,nar iter, wd j set, dom1, dom2, dom3\n")
         f.close()
     f = open(export_file_path, "a+")
     f.write(file + ",")   # file_path
@@ -470,6 +470,7 @@ def export_data(export_file_path, file, total_assertions, best_safe, best_warnin
     f.write(str(best_cost) + ",") # best cost
     f.write(str(best_iteration) + ",")  # Number of steps required to reach the best iteration
     f.write(str(total_iteration_time) + ",")    # Total time required to run all iterations
+    f.write(str(time_to_best_iteration) + ",")  # Time to best iteration
     f.write(str(best_config["wid_delay"]) + ",") # best wd
     f.write(str(best_config["narr_iter"]) + ",") # best narr iter
     f.write(str(best_config["wid_jump_set"]) + ",") # best wd j set
@@ -586,11 +587,13 @@ def main():
 
         if initial_cost[3] == 0:
             print("NO ASSERTION FOUND IN THIS PROGRAM")
-            export_data(export_file_path, file, 0, 0, 0, 0, 0, initial_configuration(), 0, 0)
+            export_data(export_file_path, file, 0, 0, 0, 0, 0, initial_configuration(), 0, 0, 0)
             continue
 
         best_iteration = 0  # Number of iterations required to reach the best configuration
         total_iteration_time = 0    # Total time required to run all optimization iterations
+        best_iteration_time = 0     # Time at best iteration
+        time_to_best_iteration = 0  # Time required to reach the best iteration
 
         # Start optimization loop
         import time
@@ -656,8 +659,13 @@ def main():
                     best_time = config_time
                     best_safe = safe
                     best_iteration = loop_step
+                    best_iteration_time = time.time()
+
         end_time = time.time()
         total_iteration_time = end_time - start_time
+        if best_iteration_time != 0:
+            time_to_best_iteration = best_iteration_time - start_time
+
 
         
         print("################## optAI.py: BEST CONFIGURATION ")
@@ -671,7 +679,7 @@ def main():
         print("all_iterations_time = " + str(total_iteration_time))
 
         # Export results
-        export_data(export_file_path, file, total_assertions, best_safe, best_warnings, best_time, best_cost, best_config, best_iteration, total_iteration_time)
+        export_data(export_file_path, file, total_assertions, best_safe, best_warnings, best_time, best_cost, best_config, best_iteration, total_iteration_time, time_to_best_iteration)
 
 
 if __name__ == '__main__':
