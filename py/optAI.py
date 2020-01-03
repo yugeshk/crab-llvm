@@ -172,7 +172,7 @@ def dars():
 
 
 
-def mutation_algorithm(previous_configuration, onlyModifyDomains):
+def mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, total_optimization_iteration):
     """
         Simulated annealing optimization algorithm
     """
@@ -202,7 +202,26 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
         # Decide an action: 20% addition, 80% modification
         action_pool = [1,2,2,2] # 1:add, 2:modification
         action = action_pool[randint(0, len(action_pool) - 1)]
-        if action == 1 and len(new_configuration) < 3 :
+
+        '''
+        Uncomment this code
+        '''
+        # Line 15,16,17 in Algo 1 in the paper
+        maxLength = 1
+        if total_optimization_iteration == 80:
+            if loop_step < 70:
+                maxLength = 2
+            if loop_step < 50:
+                maxLength = 3
+        
+        if total_optimization_iteration == 40:
+            if loop_step < 35:
+                maxLength = 2
+            if loop_step < 25:
+                maxLength = 3
+
+        #maxLength = 3
+        if action == 1 and len(new_configuration) < maxLength :
             # ADDTION
             # add the LEAST IN-COMPARABLE DOMAIN
             print("################## optAI.py: addition action chosen")
@@ -297,13 +316,13 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains):
     return parameters
 
 
-def hill_climbing(previous_configuration, loop_step):
+def hill_climbing(previous_configuration, loop_step, total_optimization_iteration):
     next_configuration = dict()
     if loop_step % 10 == 0:
         next_configuration = dars()
     else:
         onlyModifyDomains = True if loop_step >= 10 else False
-        next_configuration = mutation_algorithm(previous_configuration, onlyModifyDomains)
+        next_configuration = mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, total_optimization_iteration)
     return next_configuration
 
 
@@ -621,10 +640,10 @@ def main():
             if optimizationAlgorithm == "sa":
                 # Last 10 iterations only modify settings
                 onlyModifyDomains = True if loop_step >= 10 else False
-                new_configuration= mutation_algorithm(previous_configuration, onlyModifyDomains)
+                new_configuration= mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, int(optimization_iterations))
             
             if optimizationAlgorithm == "hc":
-                new_configuration = hill_climbing(previous_configuration, loop_step)
+                new_configuration = hill_climbing(previous_configuration, loop_step, int(optimization_iterations))
 
             if optimizationAlgorithm == "bo":
                 new_configuration = baysian_optimization()
