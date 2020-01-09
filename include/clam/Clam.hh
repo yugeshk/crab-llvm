@@ -398,6 +398,9 @@ namespace clam {
     // Begin autoAI methods
 
     void autoAI_IntraProcAnalysis(llvm::Module &M);
+
+    // Method to run the most precise available domain
+    void autoAI_runMostPreciseConfig(llvm::Module &M);
     
 
   };

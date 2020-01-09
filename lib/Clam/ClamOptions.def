@@ -469,3 +469,16 @@ cl::opt<std::string>
 resultPath("resultPath",
                 cl::desc("temporary result path"),
                 cl::init(""));
+
+
+cl::opt<bool>
+expert("expert", 
+           cl::desc("Expert experiment"),
+           cl::init(false));
+
+
+cl::opt<bool>
+mostPrecise("mostPrecise", 
+           cl::desc("Run the most precise configuration"),
+           cl::init(false));
+           

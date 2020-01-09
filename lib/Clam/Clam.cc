@@ -1277,6 +1277,97 @@ namespace clam {
         /**
         * Begin autoAI Methods
         **/
+        
+
+       // Run the most precise available domain
+       void ClamPass::autoAI_runMostPreciseConfig(Module &M){
+         errs() << "\n###### optAI: Running the most precise available doimain";
+         // Creating the results file with initial values for warnings and time
+          FILE *fp;
+          fp=fopen(resultPath.c_str(), "w");
+          fprintf(fp, "Warnings:TIMEOUT\nRunningTime:TIMEOUT");
+          fclose(fp);
+
+
+          // Create the most precise recipe
+          std::vector<std::tuple<CrabDomain, bool>> configuration;
+
+          configuration.push_back(std::make_tuple(ARRAYSMASHING_PK, false));
+          configuration.push_back(std::make_tuple(ARRAYSMASHING_BOXES, true));
+          configuration.push_back(std::make_tuple(ARRAYSMASHING_TERMS_INTERVALS, true));
+          configuration.push_back(std::make_tuple(ARRAYSMASHING_INTERVALS_CONGRUENCES, true));
+          configuration.push_back(std::make_tuple(ARRAYSMASHING_TERMS_DIS_INTERVALS, true));
+          configuration.push_back(std::make_tuple(BOOLEAN, true));
+
+          m_params.widening_delay = 16;
+          m_params.widening_jumpset = 40;
+          m_params.narrowing_iters = 4;
+
+          unsigned total_safe = 0;
+
+          clock_t begin = clock();
+          for(unsigned i=0; i < configuration.size(); i++){
+              errs() << "\n\tDomain:" << dom_to_str(std::get<0>(configuration[i])) << "   Backward:" << std::get<1>(configuration[i]);
+
+              m_params.dom = std::get<0>(configuration[i]);           // Intermediate-domain
+              m_params.run_backward = std::get<1>(configuration[i]);  // Intermediate-backward flag
+
+              // Running the domain on all the functions
+              unsigned num_analyzed_funcs = 0;
+              for (auto &F : M) {
+                  if (!isTrackable(F)) continue;
+                      num_analyzed_funcs++;
+              }
+            
+              m_checks_db.clear(); // Clear all previous results
+
+              unsigned fun_counter = 1;
+              for (auto &F : M) {
+	                if (!CrabInter && isTrackable(F)) {
+	                    ++fun_counter;
+	                    runOnFunction(F); 
+	                } 
+              }
+
+              // Get the number of safe checks
+              total_safe = total_safe + get_total_safe_checks();
+              errs() << "\n###### optAI: total safe till now: " << total_safe ;
+          }
+          clock_t end = clock();
+          // Finished running the configuration on all the functions in the Module
+
+
+
+          // Get the number of warnings
+          unsigned total_warnings = get_total_warning_checks();
+          errs() << "\n###### optAI: Total WARNING checks after running the configuration = " << total_warnings;
+
+          // Get total unsafe checks
+          unsigned total_unsafe = get_total_error_checks();
+          errs() << "\n###### optAI: Total unsafe checks after running the configuraiton = " << total_unsafe;
+
+          // Total number of checks/assertions in the program
+          unsigned total_checks = get_total_checks();
+          errs() << "\n###### optAI: Total number of checks (safe + warnings + unsafe)= " << total_safe + total_unsafe + total_warnings;
+        
+          // Get the time it took to run all the domains
+          float totalRunningTime = (1000 * float(end - begin)) / CLOCKS_PER_SEC; // milli seconds 
+          errs() << "\n###### optAI: Total Running time = " << totalRunningTime << " milli seconds";
+
+
+          // Save the results in a text file, that was pre-created by the python wrapper
+          errs() << "\n###### optAI: Temporary results path = " << resultPath ;
+          FILE *fp2;
+          fp2=fopen(resultPath.c_str(), "w");
+          fprintf(fp2, "Warnings:%d\nRunningTime:%f\nTotalAssertions:%d", total_warnings, totalRunningTime, total_safe + total_warnings + total_unsafe);
+          fclose(fp2);
+
+
+         errs() << "\n###### optAI: Done. Bye Bye";
+       }
+
+
+
         void ClamPass::autoAI_IntraProcAnalysis(Module &M){
           errs() << "\n###### optAI: Entered the intra procedural analyis core engine";
           errs() << "\n###### optAI: version 01.01.20";
@@ -1363,7 +1454,28 @@ namespace clam {
           }
           clock_t end = clock();
           // Finished running the configuration on all the functions in the Module
-  
+
+
+          if(expert) {
+            // Run the zones domain without backward and every global variable set to minimum
+            errs() << "\n###### optAI: Running the expert domain ";
+            CrabDomain expertDomain = ORIGINAL_ZONES_SPLIT_DBM;
+            m_params.dom = expertDomain;
+            m_params.run_backward = false;
+            m_params.widening_delay = 1;
+            m_params.widening_jumpset = 0;
+            m_params.narrowing_iters = 3;
+            m_checks_db.clear(); // Clear all previous results
+            for (auto &F : M) {
+	                if (!CrabInter && isTrackable(F)) {
+	                    runOnFunction(F); 
+	                } 
+              }
+          } else {
+            errs() << "\n###### optAI: EXPERT DOMAIN ***NOT*** RUNNING ";
+          }
+
+
 
           // Get the number of warnings
           unsigned total_warnings = get_total_warning_checks();
@@ -1490,7 +1602,8 @@ namespace clam {
 
     if(autoAI){
       errs() << "\n ************* autoAI analysis enabled ************* \n";
-      autoAI_IntraProcAnalysis(M);
+      if(mostPrecise) autoAI_runMostPreciseConfig(M);
+      else autoAI_IntraProcAnalysis(M);
     } else {
       errs() << "\n ************* autoAI analysis NOT enabled ********** \n";
     }

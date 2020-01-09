@@ -327,6 +327,11 @@ def parseArgs(argv):
                     default=False, action='store_true')
     p.add_argument('--resultPath', dest='resultPath', help="Temporary file to spit out the results in",
                     default="")
+    p.add_argument('--expert', dest='expert', help='Expert experiment',
+                    default=False, action='store_true')                
+    
+    p.add_argument('--mostPrecise', dest='mostPrecise', help='Run the most precise recipe', 
+                    default=False, action='store_true')
     
     ###########################
     ###########################
@@ -817,6 +822,11 @@ def clam(in_name, out_name, args, extra_opts, cpu = -1, mem = -1):
             clam_args.append('--back3=true')
         else:
             clam_args.append('--back3=false')
+
+        if args.expert:
+            clam_args.append('--expert=true')
+        if args.mostPrecise:
+            clam_args.append('--mostPrecise=true')
         # Temporary result path
         clam_args.append('--resultPath={0}'.format(args.resultPath))
     ####################################################

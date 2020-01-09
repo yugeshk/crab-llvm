@@ -207,6 +207,7 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, tot
         Uncomment this code
         '''
         # Line 15,16,17 in Algo 1 in the paper
+        '''
         maxLength = 1
         if total_optimization_iteration == 80:
             if loop_step < 70:
@@ -219,8 +220,8 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, tot
                 maxLength = 2
             if loop_step < 25:
                 maxLength = 3
-
-        #maxLength = 3
+        '''
+        maxLength = 3
         if action == 1 and len(new_configuration) < maxLength :
             # ADDTION
             # add the LEAST IN-COMPARABLE DOMAIN
@@ -502,7 +503,89 @@ def export_data(export_file_path, file, total_assertions, best_safe, best_warnin
     f.close()
 
 
+#######################################
+#######################################
+#### optAI APIs
+#######################################
+#######################################
 
+
+def run_config(path_to_input_file, domains, backward, global_settings, timeout, expert=False, server=None):
+    """
+        Runs the config
+    """
+    
+    print("Entered run_config")
+
+    analysis_results = dict()
+
+    # Intialize variables   
+    timeout_kill = "timeout " + timeout + "s "
+    dir_path = os.path.dirname(os.path.realpath(__file__)).replace("/py", "")
+    path_to_clamPy = os.path.join(dir_path, "build", "_DIR_", "bin", "clam.py")
+
+    basic_clam_flags = " --crab-check=assert --crab-do-not-print-invariants --crab-disable-warnings --crab-track=arr --crab-singleton-aliases"
+    basic_clam_flags = basic_clam_flags + " --crab-heap-analysis=cs-sea-dsa --crab-do-not-store-invariants --devirt-functions=types --externalize-addr-taken-functions"
+    basic_clam_flags = basic_clam_flags + " --lower-select --lower-unsigned-icmp" 
+        
+    # Inital run command    
+    prefix_run_command = timeout_kill + path_to_clamPy + basic_clam_flags + " " + path_to_input_file
+
+    # Parameters    
+    parameters = dict()
+    number_of_domains = len(domains)
+    parameters["domains"] = number_of_domains
+    parameters["dom1"] = domains[0]
+    parameters["dom2"] = domains[1] if number_of_domains > 1 else None
+    parameters["dom3"] = domains[2] if number_of_domains > 2 else None
+    parameters["back1"] = int(backward[0])
+    parameters["back2"] = int(backward[1]) if len(backward) > 1 else 0
+    parameters["back3"] = int(backward[2]) if number_of_domains > 2 else 0
+    parameters["wid_delay"] = global_settings[0]
+    parameters["narr_iter"] = global_settings[1]
+    parameters["wid_jump_set"] = global_settings[2]
+
+    # Initializations before the optimization loop
+    optAIflags = synthesize_optAI_flags(parameters, server)
+    if expert:
+        optAIflags = optAIflags + " --expert"
+
+    run_command = prefix_run_command + optAIflags
+    config_cost = get_cost(run_command, path_to_input_file, timeout, "expert")
+    
+
+    if config_cost[0] == "timeout":
+        #print("WHY IS IT TIMING OUT ?")
+        #raise KeyboardInterrupt
+        warnings = 0
+        time = math.inf
+        total_assertions = 0
+    else:
+        cost = float(config_cost[0])
+        warnings = float(config_cost[1])
+        time = float(config_cost[2])
+        total_assertions = float(config_cost[3])
+
+
+    analysis_results["warnings"] = warnings
+    analysis_results["time"] = time
+    analysis_results["safe"] = total_assertions - warnings
+    
+    return analysis_results
+
+
+#######################################
+#######################################
+#### optAI APIs end
+#######################################
+#######################################
+
+
+
+
+
+
+#######################################
 ############## Util functions end
 #################################
 
@@ -702,7 +785,6 @@ def main():
 
 
 if __name__ == '__main__':
-    print("################## optAI.py: RANDOM SEED NOT SET")
     main()
 
 
@@ -711,76 +793,6 @@ if __name__ == '__main__':
 """
 How to use:
 ./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="sa" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="sa" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="sa" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="sa" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="sa" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="sa" --timeOut=1 --iterations=40
-
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="rs" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="rs" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="rs" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="rs" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="rs" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="rs" --timeOut=1 --iterations=40
-
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="dars" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="dars" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="dars" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="dars" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="dars" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="dars" --timeOut=1 --iterations=40
-
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks1/" --optAlgo="hc" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks2/" --optAlgo="hc" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks3/" --optAlgo="hc" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks4/" --optAlgo="hc" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks5/" --optAlgo="hc" --timeOut=1 --iterations=40
-./Videos/crab-llvm/py/optAI.py --benchmarkFolder="/home/numair/Videos/benchmarks6/" --optAlgo="hc" --timeOut=1 --iterations=40
-
-
-TODO:
-* Ready for big experiments.
-* Maybe we need a debugging mode.
-* Hill climbing
-* Result importing and parsing
-
-
-[Experiments needed for the resubmission]
-* All 4 algorithms. 
-    (1 sec, 40 iterations)    -     (5 mins, 40 iterations)
-* All 4 algorithms.
-    (5 mins, 40 iterations)     -   (5 mins, 80 iterations)
-
-* Comparison with the most precise recipe. Do this for all or maybe some randomly selected programs.
-
-* Were the optimizations algorithms able to prove all the assertions that the expert recipie managed to prove ?
-
-
-So in total 3 experiments   -   4 algorithms
-
-
-Experiments:
- 
-    ALGO                                            projected time          Actual Time
-
-    RS      1sec, 40 iterations, 120 programs       
-    DARS    1sec, 40 iterations, 120 programs       
-    SA      1sec, 40 iterations, 120 programs       
-    HC      1sec, 40 iterations, 120 programs       
-
-
-    RS      5min, 40 iterations, 120 programs
-    DARS    5min, 40 iterations, 120 programs       
-    SA      5min, 40 iterations, 120 programs   
-    HC      5min, 40 iterations, 120 programs   
-
-
-    RS      5min, 80 iterations, 120 programs
-    DARS    5min, 80 iterations, 120 programs
-    SA      5min, 80 iterations, 120 programs
-    HC      5min, 80 iterations, 120 programs
-
 
 
 

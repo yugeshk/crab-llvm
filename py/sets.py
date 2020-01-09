@@ -140,7 +140,11 @@ array_flip = {
 }
 
 
-
+def array_smashing_domain(domain):
+    if domain in ['as-int', 'as-ric', 'as-term-int', 'as-dis-int', 'as-term-dis-int', 'as-boxes', 'as-zones', 'as-oct', 'as-pk']:
+        return True
+    else:
+        return False
 
 
 def set_difference(a, b):
