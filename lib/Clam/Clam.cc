@@ -1293,7 +1293,7 @@ namespace clam {
           std::vector<std::tuple<CrabDomain, bool>> configuration;
 
           configuration.push_back(std::make_tuple(ARRAYSMASHING_PK, false));
-          configuration.push_back(std::make_tuple(ARRAYSMASHING_BOXES, true));
+          //configuration.push_back(std::make_tuple(ARRAYSMASHING_BOXES, true));
           configuration.push_back(std::make_tuple(ARRAYSMASHING_TERMS_INTERVALS, true));
           configuration.push_back(std::make_tuple(ARRAYSMASHING_INTERVALS_CONGRUENCES, true));
           configuration.push_back(std::make_tuple(ARRAYSMASHING_TERMS_DIS_INTERVALS, true));
