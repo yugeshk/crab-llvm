@@ -13,89 +13,22 @@ ALL_DOMAINS = ['int', 'ric', 'term-int',
                 'as-dis-int', 'as-term-dis-int', 'as-boxes', 
                 'as-zones', 'as-oct', 'as-pk',
                 'bool']
-CHEAP_DOMAINS = []
+
 USABLE_LIST_OF_DOMAINS = ALL_DOMAINS
 WIDENING_DELAYS = [1, 2, 4, 8, 16]
 NARROWING_ITERATIONS = [1, 2, 3, 4]
 WIDENING_JUMP_SETS = [0, 10, 20, 30, 40]
 
-
-
-def argument_parser():
-    import argparse
-    parser = argparse.ArgumentParser(description='wrapper for optAI')
-    parser.add_argument('--inputFile', help="path to input C file")
-    parser.add_argument('--optAlgo', help="Optimization Algorithm")
-    parser.add_argument('--timeOut', help="Time out")
-    parser.add_argument('--benchmarkFolder', help="Path to benchmark folder")
-    parser.add_argument('--iterations', help="number of optimization iterations")
-    parser.add_argument('--debug', help="debug mode")
-    parser.add_argument('--server', help="server")
-    parser.add_argument('--seed', help="random seed")
-    args = vars(parser.parse_args())
-    return args
-
-
-
-def synthesize_optAI_flags(parameters, server):
-    """
-        inputs:
-            parameters: dict()
-        outputs:
-            Flags that are only accepted and processed by autoAI
-    """
-
-    # ELINA PK BACKWARD ERROR
-    if parameters["dom1"] == "pk" or parameters["dom1"] == "as-pk":
-        parameters["back1"] = 0
-    if parameters["dom2"] == "pk" or parameters["dom2"] == "as-pk":
-        parameters["back2"] = 0
-    if parameters["dom3"] == "pk" or parameters["dom3"] == "as-pk":
-        parameters["back3"] = 0
-
-    # Boxes
-    if server is not None:
-        # We are running on a server
-        if parameters["dom1"] == "boxes" or parameters["dom1"] == "as-boxes":
-            parameters["dom1"] = "bool"
-        if parameters["dom2"] == "boxes" or parameters["dom2"] == "as-boxes":
-            parameters["dom2"] = "bool"
-        if parameters["dom3"] == "boxes" or parameters["dom3"] == "as-boxes":
-            parameters["dom3"] = "bool"
-    
-
-    # Number of domains
-    domains = " --domains=" + str(parameters["domains"])
-    # domain names
-    list_of_domains = " --dom1=" + str(parameters['dom1'])
-    list_of_domains = list_of_domains + " --dom2=" + str(parameters["dom2"]) if parameters["domains"] > 1 else list_of_domains
-    list_of_domains = list_of_domains + " --dom3=" + str(parameters["dom3"]) if parameters["domains"] > 2 else list_of_domains
-    # backward flags for each domain
-    list_of_backwardFlags = " --back1" if parameters["back1"] == 1 else ""
-    list_of_backwardFlags = list_of_backwardFlags + " --back2" if parameters["back2"] == 1 and parameters["domains"] > 1 else list_of_backwardFlags
-    list_of_backwardFlags = list_of_backwardFlags + " --back3" if parameters["back3"] == 1 and parameters["domains"] > 2 else list_of_backwardFlags
-    # Global Variables
-    global_variables = " --crab-widening-delay=" + str(parameters["wid_delay"])
-    global_variables = global_variables + " --crab-narrowing-iterations=" + str(parameters["narr_iter"])
-    global_variables = global_variables + " --crab-widening-jump-set=" + str(parameters["wid_jump_set"]) 
-
-    flags = " --autoAI" + domains + list_of_domains + list_of_backwardFlags + global_variables
-    return flags
-
+# Optimization Algorithms
 
 def random_sampling():
     """
-        Step1: Randomly choose the number of domains
-        Step2: Choose random domains from the list of ALL DOMAINS
-        Step3: Choose backward flagfor each domain
-        Step4: Choose global variables
+        Random Sampling
     """
     parameters = dict()
-    
     print("################## optAI.py: Optimization strategy = Random Sampling")
     number_of_domains = randint(1,3)
     parameters["domains"] = number_of_domains
-    print("################## optAI.py: Number of domains selected = " + str(number_of_domains))
     parameters["dom1"] = USABLE_LIST_OF_DOMAINS[randint(0, len(USABLE_LIST_OF_DOMAINS)-1)]
     parameters["dom2"] = USABLE_LIST_OF_DOMAINS[randint(0, len(USABLE_LIST_OF_DOMAINS)-1)] if number_of_domains > 1 else None
     parameters["dom3"] = USABLE_LIST_OF_DOMAINS[randint(0, len(USABLE_LIST_OF_DOMAINS)-1)] if number_of_domains > 2 else None
@@ -105,18 +38,13 @@ def random_sampling():
     parameters["wid_delay"] = WIDENING_DELAYS[randint(0, len(WIDENING_DELAYS)-1)]
     parameters["narr_iter"] = NARROWING_ITERATIONS[randint(0, len(NARROWING_ITERATIONS)-1)]
     parameters["wid_jump_set"] = WIDENING_JUMP_SETS[randint(0, len(WIDENING_JUMP_SETS)-1)]
-
-    print("################## optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
-    print("################## optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
-    print("################## optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
-    print("################## optAI.py: Widening delay = " + str(parameters["wid_delay"]))
-    print("################## optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
-    print("################## optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
-
     return parameters
 
 
 def dars():
+    """
+        Domain aware random sampling
+    """
     print("################## optAI.py: Optimization strategy = LATTICE RANDOM")
     parameters = dict()
     number_of_domains = randint(1,3)
@@ -138,23 +66,13 @@ def dars():
     else:
         parameters["dom3"] = None
 
-    print("################## optAI.py: Number of domains selected = " + str(number_of_domains))
-    print("################## optAI.py: Number of domains we got = " + str(len(list_of_domains)))
     parameters["domains"] = len(list_of_domains)
     parameters["back1"] = randint(0,1)
     parameters["back2"] = randint(0,1)
     parameters["back3"] = randint(0,1)
-    print("################## optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
-    print("################## optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
-    print("################## optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
-
     parameters["wid_delay"] = WIDENING_DELAYS[randint(0, len(WIDENING_DELAYS)-1)]
     parameters["narr_iter"] = NARROWING_ITERATIONS[randint(0, len(NARROWING_ITERATIONS)-1)]
     parameters["wid_jump_set"] = WIDENING_JUMP_SETS[randint(0, len(WIDENING_JUMP_SETS)-1)]
-
-    print("################## optAI.py: Widening delay = " + str(parameters["wid_delay"]))
-    print("################## optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
-    print("################## optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
 
     # some sanity checks
     if len(list_of_domains) == 1 :
@@ -166,7 +84,6 @@ def dars():
         assert(parameters["dom1"] is not None)
         assert(parameters["dom2"] is not None)
         assert(parameters["dom3"] is not None)
-
     return parameters
 
 
@@ -176,13 +93,10 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, tot
     """
         Simulated annealing optimization algorithm
     """
-    # First get the list of domains. This i the only thing we care about in a config
     print("################## optAI.py: Optimization strategy = SIMULATED ANNEALING")
     successful_mutation  = False
     new_configuration = []
-    # Extract only domains
     if onlyModifyDomains:
-        # Array normalize the domains
         if previous_configuration["dom1"] != None:
             new_configuration.append(sets.array_normalizer[previous_configuration["dom1"]])
         if previous_configuration["dom2"] != None:
@@ -203,11 +117,7 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, tot
         action_pool = [1,2,2,2] # 1:add, 2:modification
         action = action_pool[randint(0, len(action_pool) - 1)]
 
-        '''
-        Uncomment this code
-        '''
         # Line 15,16,17 in Algo 1 in the paper
-        '''
         maxLength = 1
         if total_optimization_iteration == 80:
             if loop_step < 70:
@@ -220,22 +130,18 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, tot
                 maxLength = 2
             if loop_step < 25:
                 maxLength = 3
-        '''
-        maxLength = 3
+        #maxLength = 3
         if action == 1 and len(new_configuration) < maxLength :
             # ADDTION
             # add the LEAST IN-COMPARABLE DOMAIN
-            print("################## optAI.py: addition action chosen")
             candidate_domains = sets.get_addition_candidate_domains_for_mutation_algo(new_configuration)
             if len(candidate_domains) > 0:
                 new_configuration.append(candidate_domains[randint(0, len(candidate_domains) - 1)])
                 successful_mutation = True
         else:
             # Modificaiton
-            print("################## optAI.py: modification action chosen")
             # First decide a modification location
             mod_loc = randint(0, len(new_configuration) - 1)
-            print("################## optAI.py: mod location = " + str(mod_loc))
             # Decide a sub-action: 
             # 1: higher in the lattice  50%
             # 2: lower in the lattice   30%
@@ -294,15 +200,6 @@ def mutation_algorithm(previous_configuration, onlyModifyDomains, loop_step, tot
         parameters["dom3"] = new_configuration[2]
     else:
         parameters["dom3"] = None
-
-    print("################## optAI.py: dom1 = " + str(parameters["dom1"]) + " " + str(parameters["back1"]) )
-    print("################## optAI.py: dom2 = " + str(parameters["dom2"]) + " " + str(parameters["back2"]) )
-    print("################## optAI.py: dom3 = " + str(parameters["dom3"]) + " " + str(parameters["back3"]) )
-
-    print("################## optAI.py: Widening delay = " + str(parameters["wid_delay"]))
-    print("################## optAI.py: narrowing iteration = " + str(parameters["narr_iter"]))
-    print("################## optAI.py: Widening Jump Set = " + str(parameters["wid_jump_set"]))
-
     # some sanity checks
     if len(new_configuration) == 1 :
         assert(parameters["dom1"] is not None)
@@ -341,6 +238,55 @@ def baysian_optimization():
 
 ##############################
 ############## Util Functions
+
+def argument_parser():
+    import argparse
+    parser = argparse.ArgumentParser(description='wrapper for optAI')
+    parser.add_argument('--inputFile', help="path to input C file")
+    parser.add_argument('--optAlgo', help="Optimization Algorithm")
+    parser.add_argument('--timeOut', help="Time out")
+    parser.add_argument('--benchmarkFolder', help="Path to benchmark folder")
+    parser.add_argument('--iterations', help="number of optimization iterations")
+    parser.add_argument('--debug', help="debug mode")
+    parser.add_argument('--server', help="server")
+    parser.add_argument('--seed', help="random seed")
+    args = vars(parser.parse_args())
+    return args
+
+
+
+def synthesize_optAI_flags(parameters, server):
+    """
+        inputs:
+            parameters: dict()
+        outputs:
+            Flags that are only accepted and processed by autoAI
+    """
+
+    # ELINA PK BACKWARD ERROR
+    if parameters["dom1"] == "pk" or parameters["dom1"] == "as-pk":
+        parameters["back1"] = 0
+    if parameters["dom2"] == "pk" or parameters["dom2"] == "as-pk":
+        parameters["back2"] = 0
+    if parameters["dom3"] == "pk" or parameters["dom3"] == "as-pk":
+        parameters["back3"] = 0
+    # Number of domains
+    domains = " --domains=" + str(parameters["domains"])
+    # domain names
+    list_of_domains = " --dom1=" + str(parameters['dom1'])
+    list_of_domains = list_of_domains + " --dom2=" + str(parameters["dom2"]) if parameters["domains"] > 1 else list_of_domains
+    list_of_domains = list_of_domains + " --dom3=" + str(parameters["dom3"]) if parameters["domains"] > 2 else list_of_domains
+    # backward flags for each domain
+    list_of_backwardFlags = " --back1" if parameters["back1"] == 1 else ""
+    list_of_backwardFlags = list_of_backwardFlags + " --back2" if parameters["back2"] == 1 and parameters["domains"] > 1 else list_of_backwardFlags
+    list_of_backwardFlags = list_of_backwardFlags + " --back3" if parameters["back3"] == 1 and parameters["domains"] > 2 else list_of_backwardFlags
+    # Global Variables
+    global_variables = " --crab-widening-delay=" + str(parameters["wid_delay"])
+    global_variables = global_variables + " --crab-narrowing-iterations=" + str(parameters["narr_iter"])
+    global_variables = global_variables + " --crab-widening-jump-set=" + str(parameters["wid_jump_set"]) 
+
+    flags = " --autoAI" + domains + list_of_domains + list_of_backwardFlags + global_variables
+    return flags
 
 
 def initial_configuration():
@@ -498,7 +444,7 @@ def export_data(export_file_path, file, total_assertions, best_safe, best_warnin
     if best_config["dom2"] is not None:
         f.write(str(best_config["dom2"]) + "<<" +str(best_config["back2"]) + ">>,") # domain  2
     if best_config["dom3"] is not None:
-        f.write(str(best_config["dom3"]) + "<<" +str(best_config["back3"]) + ">>,") # domain  1
+        f.write(str(best_config["dom3"]) + "<<" +str(best_config["back3"]) + ">>,") # domain  3
     f.write("\n")
     f.close()
 
@@ -508,6 +454,17 @@ def export_data(export_file_path, file, total_assertions, best_safe, best_warnin
 #### optAI APIs
 #######################################
 #######################################
+
+
+def optimize(path_to_input_file, seed=42):
+    """
+        Find the best recipe for the given program using DARS
+    """
+    print("Optimizing with DARS")
+    configuration = dars()
+
+
+
 
 
 def run_config(path_to_input_file, domains, backward, global_settings, timeout, expert=False, server=None):

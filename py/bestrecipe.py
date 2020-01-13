@@ -87,4 +87,4 @@ def main():
 if __name__ == '__main__':
     main()
     #path_to_input_file = "/home/numair/Videos/crab-llvm/benchmarks/benchmarks2/11.bc"
-    #original_analysis_results = optAI.run_config(path_to_input_file, ["pk"], ["0"], ["16", "4", "40"], "50", False, None)
+    #original_analysis_results = optAI.run_config(path_to_input_file, ["as-zones"], ["1"], ["16", "4", "40"], "50", False, None)
