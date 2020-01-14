@@ -1,3 +1,4 @@
+#include <math.h>
 #include "clam/config.h"
 #include "path_analyzer.hpp"
 // flat_killgen_domain
