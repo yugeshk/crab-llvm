@@ -45,6 +45,9 @@ RUN ln -s /clang-5.0/bin/clang++ run/bin/clang++
 ENV PATH "/deps/LLVM-5.0.2-Linux/bin:$PATH"
 ENV PATH "/clam/build/run/bin:$PATH"
 
+# reload list of shared libraries for the dynamic linker
+RUN ldconfig -v /clam/build/run/lib
+
 # run tests
 RUN cmake --build . --target test-simple
 RUN cmake --build . --target test-readme
