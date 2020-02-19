@@ -73,6 +73,8 @@ bool isIntArray(const llvm::Type &T);
 
 bool isAssertFn(const llvm::Function &F);
 
+bool isAssertFn(const llvm::Function &F);
+
 bool isSeaHornFail(const llvm::Function &F);
 
 bool isErrorFn(const llvm::Function &F);

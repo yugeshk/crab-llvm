@@ -400,18 +400,15 @@ namespace clam {
    * Internal implementation of the intra-procedural analysis
    **/
   class IntraClam_Impl {
-  public:
-    IntraClam_Impl(const Function &fun, CrabBuilderManager &man)
-      : m_cfg_builder(nullptr), m_fun(fun), m_vfac(man.get_var_factory()) {
+  	public:
+    	IntraClam_Impl(const Function &fun, CrabBuilderManager &man)
+      		: m_cfg_builder(nullptr), m_fun(fun), m_vfac(man.get_var_factory()) {
       
-      if (isTrackable(m_fun)) {
-	if (!man.has_cfg(m_fun)) {
-	  CRAB_VERBOSE_IF(1, crab::get_msg_stream()
-			  << "Started Crab CFG construction for "
-			  << fun.getName() << "\n");	  
-	  m_cfg_builder = man.mk_cfg_builder(m_fun);
-	  CRAB_VERBOSE_IF(1, crab::get_msg_stream()
-			  << "Finished Crab CFG construction for "
+      	if (isTrackable(m_fun)) {
+			if (!man.has_cfg(m_fun)) {
+	  			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Started Crab CFG construction for " << fun.getName() << "\n");	  
+	  			m_cfg_builder = man.mk_cfg_builder(m_fun);
+	  			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished Crab CFG construction for "
 			  << fun.getName() << "\n");	
 	} else {
 	  m_cfg_builder = man.get_cfg_builder(m_fun);
@@ -422,254 +419,324 @@ namespace clam {
       }
     }
 
-    void Analyze(AnalysisParams &params,
-		 const llvm::BasicBlock *entry,
-		 const assumption_map_t &assumptions,
-		 AnalysisResults &results) {
-
-      if (!m_cfg_builder) {
-	CRAB_VERBOSE_IF(1, llvm::outs() << "Skipped analysis for "
-			                << m_fun.getName() << "\n");
-	return;
-      }
+    void Analyze(AnalysisParams &params, const llvm::BasicBlock *entry, const assumption_map_t &assumptions, AnalysisResults &results) {		
+		if (!m_cfg_builder) {
+			CRAB_VERBOSE_IF(1, llvm::outs() << "Skipped analysis for " << m_fun.getName() << "\n");
+			return;
+      	}
       
-      // -- run liveness
-      liveness_t live(get_cfg());
-      if (params.run_liveness || isRelationalDomain(params.dom)) {
-	CRAB_VERBOSE_IF(1,
-			auto fdecl = get_cfg().get_func_decl();            
-			crab::get_msg_stream() << "Running liveness analysis for " 
-			              << fdecl.get_func_name()
-		                      << "  ...\n";);
-	live.exec();
-	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished liveness analysis.\n");
-	// some stats
-	unsigned total_live, avg_live_per_blk, max_live_per_blk;
-	live.get_stats(total_live, max_live_per_blk, avg_live_per_blk);
-	CRAB_VERBOSE_IF(1, 
-		  crab::outs() << "-- Max number of out live vars per block=" 
-                               << max_live_per_blk << "\n"
-                               << "-- Avg number of out live vars per block=" 
-                               << avg_live_per_blk << "\n";);
-	crab::CrabStats::count_max("Liveness.count.maxOutVars",
-				    max_live_per_blk);
+      	// -- run liveness
+      	liveness_t live(get_cfg());
+      	if (params.run_liveness || isRelationalDomain(params.dom)) {
+			CRAB_VERBOSE_IF(1,
+				auto fdecl = get_cfg().get_func_decl();            
+				crab::get_msg_stream() << "Running liveness analysis for " << fdecl.get_func_name() << "  ...\n";);
+			live.exec();
+			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished liveness analysis.\n");
+			// some stats
+			unsigned total_live, avg_live_per_blk, max_live_per_blk;
+			live.get_stats(total_live, max_live_per_blk, avg_live_per_blk);
+			CRAB_VERBOSE_IF(1, 
+		  		crab::outs() << "-- Max number of out live vars per block=" 
+                    << max_live_per_blk << "\n"
+                        << "-- Avg number of out live vars per block=" 
+                            << avg_live_per_blk << "\n";);
+				crab::CrabStats::count_max("Liveness.count.maxOutVars", max_live_per_blk);
 
-	if (isRelationalDomain(params.dom)) {
-	  CRAB_VERBOSE_IF(1, 
-		    crab::outs() << "Max live per block: "
-		                 << max_live_per_blk << "\n"
-		                 << "Threshold: "
-		                 << params.relational_threshold << "\n");
-#ifdef HAVE_ALL_DOMAINS	  
-	  if (max_live_per_blk > params.relational_threshold) {
-	    // default domain
-	    params.dom = INTERVALS;
-	  }
-#endif 	  
+			if (isRelationalDomain(params.dom)) {
+	  			CRAB_VERBOSE_IF(1, 
+		    		crab::outs() << "Max live per block: "
+		            	<< max_live_per_blk << "\n"
+		                	<< "Threshold: "
+		                 		<< params.relational_threshold << "\n");
+				#ifdef HAVE_ALL_DOMAINS	  
+	  				if (max_live_per_blk > params.relational_threshold) {
+	    			// default domain
+	    			params.dom = INTERVALS;
+	  				}
+				#endif 	  
+			}
+      	}
+
+      	if (CrabBuildOnlyCFG) {
+			return;
+      	}
+      
+      	if (intra_analyses.count(params.dom)) {
+      		intra_analyses.at(params.dom).analyze(params, entry, assumptions, (params.run_liveness)? &live : nullptr, results);
+      	} 
+		else {
+      		crab::outs() << "Warning: abstract domain not found or enabled.\n" << "Compile with -DALL_DOMAINS=ON.\n";
+      	}
+
+		const Function *F = entry->getParent();
+		for(inst_iterator It = inst_begin(F), E = inst_end(F); It != E; ++It){
+			if(It->getOpcode() == 56){ //This is a call instruction
+				if(It->getName() == "@__CLAM_print_lin_cst()"){ //This is our required instruction check
+					llvm::BasicBlock *llvm_bb = It->getParent();
+					auto pre = IntraClam::get_pre(llvm_bb, true); //pre condition for the entry of basic block
+					basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
+					basic_block_t bb = CfgBuilderImpl::lookup(*llvm_bb);
+					switch(entry->getId()){
+						case GenericAbsDomWrapper::intv:{
+							interval_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						case GenericAbsDomWrapper::ric: {
+							ric_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						case GenericAbsDomWrapper::term_intv: {
+							term_int_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						case GenericAbsDomWrapper::term_dis_intv: {
+							term_dis_int_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						case GenericAbsDomWrapper::oct: {
+							oct_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						case GenericAbsDomWrapper::num: {
+							num_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						case GenericAbsDomWrapper::boxes: {
+							boxes_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						case GenericAbsDomWrapper::pk: {
+							pk_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						} 
+						case GenericAbsDomWrapper::split_dbm: {
+							split_dbm_domain_t inv;
+							getAbsDomWrappee(pre, inv);
+							runClamPrintFunction(inv, bb, F->getContext());
+							break;
+						}
+						default :{
+							report_fatal_error("abstract domain not supported by --crab-add-invariants");
+						}
+					}
+				}
+			}
+		}
 	}
-      }
-
-      if (CrabBuildOnlyCFG) {
-	return;
-      }
-      
-      if (intra_analyses.count(params.dom)) {
-      	intra_analyses.at(params.dom).analyze(params, entry, assumptions,
-					    (params.run_liveness)? &live : nullptr,
-					     results);
-      } else {
-      	crab::outs() << "Warning: abstract domain not found or enabled.\n"
-		     << "Compile with -DALL_DOMAINS=ON.\n";
-	// crab::outs() << "Running " << intra_analyses.at(INTERVALS).name << " ...\n"; 
-      	// intra_analyses.at(INTERVALS).analyze(params, entry, assumptions,
-	// 				   (params.run_liveness)? &live : nullptr,
-	// 				    results);
-      }
-    }
+	
+	template<typename AbsDomain>
+	void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, LLVMContext &ctx){
+		typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
+		abs_tr_t vis(inv);
+		//Now we start forward propagation
+		for(auto &s: bb){
+			AbsDomain next_inv = std::move(vis.get_abs_value()); //next_inv is the invariant that holds just before executing s
+			if(CfgBuilder::get_instruction(s)->getName()=="@__CLAM_print_lin_cst()"){
+				//Here we print out the lin_cst
+				auto csts = next_inv->to_linear_constraint_system();
+				llvm::outs() << "I have them all!!!!!!!!\n";
+			}
+			else{
+				s.accept(&vis); //propagate invariant one step forward
+			}
+		}
+	}
     
     bool pathAnalyze(const AnalysisParams& params,
 		     const std::vector<const llvm::BasicBlock*>& blocks,
 		     bool layered_solving, 
 		     std::vector<crab::cfg::statement_wrapper>& core,
-		     bool populate_inv_map, invariant_map_t& post) const { 
+		     bool populate_inv_map, invariant_map_t& post) const 
+	{ 
 		     
-      assert(m_cfg_builder);
+		assert(m_cfg_builder);
 
-      // build the full path (included internal basic blocks added
-      // during the translation to Crab)
-      std::vector<basic_block_label_t> path;
-      path.reserve(blocks.size());
-      for(unsigned i=0; i < blocks.size(); ++i) {
-	path.push_back(m_cfg_builder->get_crab_basic_block(blocks[i]));
-	if (i < blocks.size() - 1) {
-	  if (const basic_block_label_t* edge_bb =
-	      m_cfg_builder->get_crab_basic_block(blocks[i], blocks[i+1])) {
-	    path.push_back(*edge_bb);
-	  }
+		// build the full path (included internal basic blocks added
+		// during the translation to Crab)
+		std::vector<basic_block_label_t> path;
+		path.reserve(blocks.size());
+		for(unsigned i=0; i < blocks.size(); ++i) {
+			path.push_back(m_cfg_builder->get_crab_basic_block(blocks[i]));
+			if (i < blocks.size() - 1) {
+				if (const basic_block_label_t* edge_bb = m_cfg_builder->get_crab_basic_block(blocks[i], blocks[i+1])) {
+					path.push_back(*edge_bb);
+				}
+			}
+		}
+
+		bool res;
+		if (path_analyses.count(params.dom)) {
+			path_analyses.at(params.dom).analyze(path, core, layered_solving , populate_inv_map, post, res);
+		}
+		else {
+			crab::outs() << "Warning: abstract domain not found or enabled.\n" << "Compile with -DALL_DOMAINS=ON.\n";
+			// crab::outs() << "Running " << path_analyses.at(INTERVALS).name << " ...\n";
+			// path_analyses.at(INTERVALS).analyze(path, core, layered_solving, populate_inv_map, post, res);
+		}
+	return res;
 	}
-      }
+    
+  	private:
+    
+		CrabBuilderManager::CfgBuilderPtr m_cfg_builder;
+		const Function &m_fun;
+		llvm_variable_factory &m_vfac;
 
-      bool res;
-      if (path_analyses.count(params.dom)) {
-      	path_analyses.at(params.dom).analyze(path, core, layered_solving , populate_inv_map,
-					     post, res);
-      } else {
-      	crab::outs() << "Warning: abstract domain not found or enabled.\n"
-		     << "Compile with -DALL_DOMAINS=ON.\n";
-	// crab::outs() << "Running " << path_analyses.at(INTERVALS).name << " ...\n";
-      	// path_analyses.at(INTERVALS).analyze(path, core, layered_solving, populate_inv_map,
-	// 				    post, res);
-      }
-      return res;
+		// helper to get a reference to a crab cfg from the builder
+		cfg_t& get_cfg() { return m_cfg_builder->get_cfg(); }
+		
+		template<typename Dom>
+		void analyzeCfg(const AnalysisParams &params,
+				const BasicBlock *entry,
+				const assumption_map_t &assumptions, liveness_t *live,
+				AnalysisResults &results) {
+		
+		// -- we use the combined forward/backward analyzer
+		typedef intra_forward_backward_analyzer<cfg_ref_t, Dom> intra_analyzer_t;
+		// -- checkers for assertions and nullity
+		typedef intra_checker<intra_analyzer_t> intra_checker_t;
+		typedef assert_property_checker<intra_analyzer_t> assert_prop_t;
+		//typedef null_property_checker<intra_analyzer_t> null_prop_t;
+		
+		CRAB_VERBOSE_IF(1,
+				auto fdecl = get_cfg().get_func_decl();            
+				crab::get_msg_stream() << "Running intra-procedural analysis with " 
+								<< "\"" << Dom::getDomainName()  << "\""
+								<< " for "  << fdecl.get_func_name()
+								<< "  ... \n";);
+		
+		// -- run intra-procedural analysis
+		intra_analyzer_t analyzer(get_cfg());
+		typename intra_analyzer_t::assumption_map_t crab_assumptions;
+		// reconstruct a crab assumption map from our assumption DenseMap
+		for (auto &kv: assumptions) {
+			Dom absval = Dom::top();
+			absval += kv.second;
+			crab_assumptions.insert({m_cfg_builder->get_crab_basic_block(kv.first), absval});
+		}
+		
+		// We use as initial state an assumption if exists
+		Dom entry_dom = Dom::top();
+		auto it = crab_assumptions.find(m_cfg_builder->get_crab_basic_block(entry));
+		if (it != crab_assumptions.end()) {
+			entry_dom = it->second;
+		}
+		
+		analyzer.run(m_cfg_builder->get_crab_basic_block(entry), entry_dom, 
+			!params.run_backward, crab_assumptions, live,
+			params.widening_delay, params.narrowing_iters, params.widening_jumpset);
+		CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished intra-procedural analysis.\n"); 
+
+		// -- store invariants
+    if (params.store_invariants || params.print_invars) {
+			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Storing invariants.\n");       
+			for (basic_block_label_t bl: llvm::make_range(get_cfg().label_begin(), get_cfg().label_end())) {
+	  			if (bl.is_edge()) {
+				// Note that we use get_post instead of get_pre:
+	    		//   the crab block (bl) has an assume statement corresponding
+	    		//   to the branch condition in the predecessor of the
+	    		//   LLVM edge. We want the invariant *after* the
+	    		//   evaluation of the assume.		
+	    			if (analyzer.get_post(bl).is_bottom()) {
+	      				results.infeasible_edges.insert({bl.get_edge().first, bl.get_edge().second});
+	    			}
+	  			}
+				else if (const BasicBlock *B = bl.get_basic_block()) {
+	    			// --- invariants that hold at the entry of the blocks
+	    			auto pre = analyzer.get_pre(bl);
+	    			update(results.premap, *B,  mkGenericAbsDomWrapper(pre));
+	    			// --- invariants that hold at the exit of the blocks
+	    			auto post = analyzer.get_post(bl);
+	    			update(results.postmap, *B,  mkGenericAbsDomWrapper(post));
+	    			#if 0
+	    				if (params.stats) {
+	      				unsigned num_block_invars = 0;
+	      				// XXX: for boxes it would be more useful to get a measure
+	      				// from to_disjunctive_linear_constraint_system() but it
+	      				// can be really slow. 
+	      				num_block_invars += pre.to_linear_constraint_system().size();
+	      				num_invars += num_block_invars;
+	      				if (num_block_invars > 0) num_nontrivial_blocks++;
+	    				}
+	    			#endif 
+	  			} else {
+	    			// this should be unreachable
+	    			assert(false && "A Crab block should correspond to either an LLVM edge or block");
+	  			}
+			}
+			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "All invariants stored.\n");
     }
-    
-  private:
-    
-    CrabBuilderManager::CfgBuilderPtr m_cfg_builder;
-    const Function &m_fun;
-    llvm_variable_factory &m_vfac;
+      
+      	// -- print all cfg annotations (if any)
+      	if (params.print_invars || params.print_unjustified_assumptions) {
 
-    // helper to get a reference to a crab cfg from the builder
-    cfg_t& get_cfg() { return m_cfg_builder->get_cfg(); }
-    
-    template<typename Dom>
-    void analyzeCfg(const AnalysisParams &params,
-		    const BasicBlock *entry,
-		    const assumption_map_t &assumptions, liveness_t *live,
-		    AnalysisResults &results) {
-      
-      // -- we use the combined forward/backward analyzer
-      typedef intra_forward_backward_analyzer<cfg_ref_t,Dom> intra_analyzer_t;
-      // -- checkers for assertions and nullity
-      typedef intra_checker<intra_analyzer_t> intra_checker_t;
-      typedef assert_property_checker<intra_analyzer_t> assert_prop_t;
-      //typedef null_property_checker<intra_analyzer_t> null_prop_t;
-      
-      CRAB_VERBOSE_IF(1,
-		      auto fdecl = get_cfg().get_func_decl();            
-		      crab::get_msg_stream() << "Running intra-procedural analysis with " 
-		                    << "\"" << Dom::getDomainName()  << "\""
-		                    << " for "  << fdecl.get_func_name()
-		                    << "  ... \n";);
-      
-      // -- run intra-procedural analysis
-      intra_analyzer_t analyzer(get_cfg());
-      typename intra_analyzer_t::assumption_map_t crab_assumptions;
-      // reconstruct a crab assumption map from our assumption DenseMap
-      for (auto &kv: assumptions) {
-	Dom absval = Dom::top();
-	absval += kv.second;
-	crab_assumptions.insert({m_cfg_builder->get_crab_basic_block(kv.first), absval});
-      }
-      
-      // We use as initial state an assumption if exists
-      Dom entry_dom = Dom::top();
-      auto it = crab_assumptions.find(m_cfg_builder->get_crab_basic_block(entry));
-      if (it != crab_assumptions.end()) {
-	entry_dom = it->second;
-      }
-      
-      analyzer.run(m_cfg_builder->get_crab_basic_block(entry), entry_dom, 
-		   !params.run_backward, crab_assumptions, live,
-		   params.widening_delay, params.narrowing_iters, params.widening_jumpset);
-      CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished intra-procedural analysis.\n"); 
+			typedef pretty_printer_impl::block_annotation block_annotation_t;
+			typedef pretty_printer_impl::invariant_annotation inv_annotation_t;
+			typedef pretty_printer_impl::unjust_assumption_annotation unjust_assume_annotation_t;
+			std::vector<std::unique_ptr<block_annotation_t>> pool_annotations;
 
-      // -- store invariants
-      if (params.store_invariants || params.print_invars) {
-	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Storing invariants.\n");       
-	for (basic_block_label_t bl: llvm::make_range(get_cfg().label_begin(),
-						      get_cfg().label_end())) {
-	  if (bl.is_edge()) {
-	    // Note that we use get_post instead of get_pre:
-	    //   the crab block (bl) has an assume statement corresponding
-	    //   to the branch condition in the predecessor of the
-	    //   LLVM edge. We want the invariant *after* the
-	    //   evaluation of the assume.		
-	    if (analyzer.get_post(bl).is_bottom()) {
-	      results.infeasible_edges.insert({bl.get_edge().first, bl.get_edge().second});
-	    }
-	  } else if (const BasicBlock *B = bl.get_basic_block()) {
-	    // --- invariants that hold at the entry of the blocks
-	    auto pre = analyzer.get_pre(bl);
-	    update(results.premap, *B,  mkGenericAbsDomWrapper(pre));
-	    // --- invariants that hold at the exit of the blocks
-	    auto post = analyzer.get_post(bl);
-	    update(results.postmap, *B,  mkGenericAbsDomWrapper(post));
-	    #if 0
-	    if (params.stats) {
-	      unsigned num_block_invars = 0;
-	      // XXX: for boxes it would be more useful to get a measure
-	      // from to_disjunctive_linear_constraint_system() but it
-	      // can be really slow. 
-	      num_block_invars += pre.to_linear_constraint_system().size();
-	      num_invars += num_block_invars;
-	      if (num_block_invars > 0) num_nontrivial_blocks++;
-	    }
-	    #endif 
-	  } else {
-	    // this should be unreachable
-	    assert(false && "A Crab block should correspond to either an LLVM edge or block");
-	  }
-	}
-	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "All invariants stored.\n");
-      }
-      
-      // -- print all cfg annotations (if any)
-      if (params.print_invars ||
-	  params.print_unjustified_assumptions) {
+			if (get_cfg().has_func_decl()) {
+	  			auto fdecl = get_cfg().get_func_decl();
+	  			crab::outs() << "\n" << fdecl << "\n";
+			}
+			else {
+	  			llvm::outs() << "\n" << "function " << m_fun.getName() << "\n";
+			}
+			if (params.print_invars) {
+	  			pool_annotations.emplace_back(
+	     	  		make_unique<inv_annotation_t>(m_vfac, results.premap, results.postmap, params.keep_shadow_vars));
+			}
 
-	typedef pretty_printer_impl::block_annotation block_annotation_t;
-	typedef pretty_printer_impl::invariant_annotation inv_annotation_t;
-	typedef pretty_printer_impl::unjust_assumption_annotation unjust_assume_annotation_t;
-	std::vector<std::unique_ptr<block_annotation_t>> pool_annotations;
-
-	if (get_cfg().has_func_decl()) {
-	  auto fdecl = get_cfg().get_func_decl();
-	  crab::outs() << "\n" << fdecl << "\n";
-	} else {
-	  llvm::outs() << "\n" << "function " << m_fun.getName() << "\n";
-	}
-	if (params.print_invars) {
-	  pool_annotations.emplace_back(
-	       make_unique<inv_annotation_t>(m_vfac, results.premap, results.postmap, 
-					     params.keep_shadow_vars));
-	}
-
-	// XXX: it must be alive when print_annotations is called.
-	#if 0
-	assumption_naive_analysis<cfg_ref_t> unjust_assumption_analyzer(get_cfg());
-	#else
-	assumption_dataflow_analysis<cfg_ref_t> unjust_assumption_analyzer(get_cfg());
-	#endif 
+			// XXX: it must be alive when print_annotations is called.
+			#if 0
+				assumption_naive_analysis<cfg_ref_t> unjust_assumption_analyzer(get_cfg());
+			#else
+				assumption_dataflow_analysis<cfg_ref_t> unjust_assumption_analyzer(get_cfg());
+			#endif 
 	
-	if (params.print_unjustified_assumptions) {
-	  // -- run first the analysis
-	  unjust_assumption_analyzer.exec();
-	  pool_annotations.emplace_back(
-	    make_unique<unjust_assume_annotation_t>(get_cfg(), &unjust_assumption_analyzer));
-	}
+			if (params.print_unjustified_assumptions) {
+	  			// -- run first the analysis
+	  			unjust_assumption_analyzer.exec();
+	  			pool_annotations.emplace_back(
+	    		make_unique<unjust_assume_annotation_t>(get_cfg(), &unjust_assumption_analyzer));
+			}
 
-	pretty_printer_impl::print_annotations(get_cfg(), pool_annotations);
-      }
+			pretty_printer_impl::print_annotations(get_cfg(), pool_annotations);
+      	}
           
-      if (params.check) {
-	// --- checking assertions and collecting data
-	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Checking assertions ... \n"); 
-	typename intra_checker_t::prop_checker_ptr
-	  prop(new assert_prop_t(params.check_verbose));
-	// if (params.check == NULLITY)
-	//   prop.reset(new null_prop_t(params.check_verbose));
-	intra_checker_t checker(analyzer, {prop});
-	checker.run();
-	CRAB_VERBOSE_IF(1,
-			llvm::outs() << "Function " << m_fun.getName() << "\n";
+      	if (params.check) {
+			// --- checking assertions and collecting data
+			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Checking assertions ... \n"); 
+			typename intra_checker_t::prop_checker_ptr
+	  		prop(new assert_prop_t(params.check_verbose));
+			// if (params.check == NULLITY)
+			//   prop.reset(new null_prop_t(params.check_verbose));
+			intra_checker_t checker(analyzer, {prop});
+			checker.run();
+			CRAB_VERBOSE_IF(1, llvm::outs() << "Function " << m_fun.getName() << "\n";
 			checker.show(crab::outs()));
-	results.checksdb += checker.get_all_checks();
-	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished assert checking.\n");      
-      }
+			results.checksdb += checker.get_all_checks();
+			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished assert checking.\n");      
+      	}
 
-      
-      return;
+      	return;
     }
 
     template<typename AbsDom>
@@ -1383,17 +1450,22 @@ namespace clam {
       AnalysisResults results = { m_pre_map, m_post_map, m_infeasible_edges, m_checks_db};
       inter_crab.Analyze(m_params, assumption_map_t(), results);
     } else {
-      unsigned fun_counter = 1;
-      for (auto &F : M) {
-	if (!CrabInter && isTrackable(F)) {
-	  CRAB_VERBOSE_IF(1,
-			  crab::get_msg_stream() << "###Function "
-			  << fun_counter << "/" << num_analyzed_funcs << "###\n";);
-	  ++fun_counter;
-	  runOnFunction(F); 
-	}
-      }
+      unsigned fun_counter = 1; 
+      	for (auto &F : M) {
+			if (!CrabInter && isTrackable(F)) {
+	  			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "###Function " << fun_counter << "/" << num_analyzed_funcs << "###\n";);
+	  			++fun_counter;
+	  			runOnFunction(F); 
+			}
+      	}
     }
+
+	//Now that analysis is over, we can look for our print statements
+	// for (auto &F: M){
+	// 	if(!CrabInter && isTrackable(F)){
+	// 		runClamFunction(F);
+	// 	}
+	// }
 
     if (CrabStats) {
       crab::CrabStats::PrintBrunch(crab::outs());
@@ -1432,6 +1504,27 @@ namespace clam {
     IntraClam_Impl crab(F, *m_cfg_builder_man);
     AnalysisResults results = { m_pre_map, m_post_map, m_infeasible_edges, m_checks_db};
     crab.Analyze(m_params, &F.getEntryBlock(), assumption_map_t(), results);
+
+	//Print linear constraints here
+	// typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
+	// for(inst_iterator It = inst_begin(F), E = inst_end(F); It != E; ++It){
+	// 	if(It->getOpcode() == 56){ //This is a call instruction
+	// 		if(It->getName() == "@__CLAM_print_lin_cst()"){ //This is our required instruction check
+	// 			llvm::BasicBlock *llvm_bb = It->getParent();
+	// 			//clam::wrapper_dom_ptr pre = clam::lookup(results.m_pre_map, llvm_bb, std::vector<varname_t>());
+	// 			auto pre = get_pre(llvm_bb, true);
+	// 			switch(pre->getId()){
+	// 				case GenericAbsDomWrapper::intv:{
+	//   					interval_domain_t inv;
+	//   					getAbsDomWrappee(pre, inv);
+	// 			}
+	// 			abs_tr_t vis(inv);
+	// 			basic_block_label_t bb_label =
+
+	// 			for(auto &s: )
+	// 		}
+	// 	}
+	// }
     return false;
   }
   
