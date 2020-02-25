@@ -194,6 +194,7 @@ bool isPrintFn(const Function &F){
   return (F.getName().equals("__CLAM_print_lin_cst"));
 }
 
+
 bool isNotAssumeFn(const Function &F) {
   return (F.getName().equals("verifier.assume.not") ||
           F.getName().equals("__VERIFIER_assume_not") ||
