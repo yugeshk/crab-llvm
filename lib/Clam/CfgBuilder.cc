@@ -2254,9 +2254,7 @@ void CrabInstVisitor::visitCallInst(CallInst &I) {
   }
 
   if(isPrintFn(*callee)){
-	  std::vector<var_t> A;
-	  std::vector<var_t> B;
-	  m_bb.callsite(callee->getName().str(), A, B);
+	  m_bb.callsite(callee->getName().str());
 	  return;
   }
 
