@@ -2229,211 +2229,230 @@ void CrabInstVisitor::visitCallInst(CallInst &I) {
     	}
 		else {
       	// -- unresolved indirect call
-      	CLAM_WARNING("skipped indirect call. Enabling --devirt-functions might help.");
+			CLAM_WARNING("skipped indirect call. Enabling --devirt-functions might help.");
 
-      	if (DoesCallSiteReturn(I, m_params) && ShouldCallSiteReturn(I, m_params)) {
-        	// havoc return value
-        	crab_lit_ref_t lhs = m_lfac.getLit(I);
-        	assert(lhs && lhs->isVar());
-        	havoc(lhs->getVar(), m_bb, m_params.include_useless_havoc);
-      	}
-    }
-    return;
-  }
+			if (DoesCallSiteReturn(I, m_params) && ShouldCallSiteReturn(I, m_params)) {
+				// havoc return value
+				crab_lit_ref_t lhs = m_lfac.getLit(I);
+				assert(lhs && lhs->isVar());
+				havoc(lhs->getVar(), m_bb, m_params.include_useless_havoc);
+			}
+    	}
+    	return;
+  	}
 
-  if (callee->getName().startswith("shadow.mem")) {
-    return;
-  }
+	if (callee->getName().startswith("shadow.mem")) {
+		return;
+	}
 
-  if (callee->getName().equals("seahorn.fn.enter"))
-    return;
+	if (callee->getName().equals("seahorn.fn.enter"))
+		return;
 
-  if (isVerifierCall(*callee)) {
-    doVerifierCall(I);
-    return;
-  }
+	if (isVerifierCall(*callee)) {
+		doVerifierCall(I);
+		return;
+	}
 
-  if(isPrintFn(*callee)){
-	  m_bb.callsite(callee->getName().str());
-	  return;
-  }
+	if(isClamPrintFn(*callee)){
+		m_bb.callsite(callee->getName().str(), 90);
+		return;
+	}
 
-  if (isAllocationFn(&I, m_tli)) {
-    doAllocFn(I);
-    return;
-  }
+	if(isClamVarTagsFn(*callee)){
+		std::vector<var_t> inputs;
 
-  if (m_params.enabled_array_initialization() &&
-      (isZeroInitializer(*callee) || isIntInitializer(*callee))) {
-    doGlobalInitializer(I);
-    return;
-  }
+		// -- add the actual parameters of the llvm callsite: i1,...in.
+		for (auto &a : llvm::make_range(CS.arg_begin(), CS.arg_end())) {
+			Value *v = a.get();
+			if (!isTracked(*v, m_params))
+				continue;
+			inputs.push_back(normalizeFuncParamOrRet(*v, m_bb, m_lfac));
+		}
+		m_bb.callsite(callee->getName().str(), inputs, 91);
+		return;
+	}
 
-  if (callee->isIntrinsic()) {
-    if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I)) {
-      doMemIntrinsic(*MI);
-    } else {
-      if (DoesCallSiteReturn(I, m_params) &&
-          ShouldCallSiteReturn(I, m_params)) {
-        // -- havoc return value of the intrinsics
-        crab_lit_ref_t lhs = m_lfac.getLit(I);
-        assert(lhs && lhs->isVar());
-        havoc(lhs->getVar(), m_bb, m_params.include_useless_havoc);
-      }
-    }
-    return;
-  }
+  	if (isAllocationFn(&I, m_tli)) {
+    	doAllocFn(I);
+    	return;
+  	}
 
-  if (callee->isDeclaration() || callee->isVarArg() ||
-      !m_params.interprocedural) {
-    /**
-     * If external or we don't perform inter-procedural reasoning
-     * then we make sure all modified arrays and return value of
-     * the callsite are havoc'ed.
-     * 
-     * TODOX: version for memory ssa form, otherwise results can be
-     * unsound.  There is currently an implicit assumption that memory
-     * ssa can be only used when the program has been fully inlined.
-     **/
+  	if (m_params.enabled_array_initialization() && (isZeroInitializer(*callee) || isIntInitializer(*callee))) {
+    	doGlobalInitializer(I);
+    	return;
+  	}
 
-    // -- havoc return value
-    if (DoesCallSiteReturn(I, m_params) && ShouldCallSiteReturn(I, m_params)) {
-      crab_lit_ref_t lhs = m_lfac.getLit(I);
-      assert(lhs && lhs->isVar());
-      havoc(lhs->getVar(), m_bb, m_params.include_useless_havoc);
-    }
-    // -- havoc all modified regions by the callee
-    if (m_lfac.get_track() == ARR) {
-      RegionVec mods = get_modified_regions(m_mem, I);
-      for (auto a : mods) {
-        if (get_singleton_value(a, m_params.lower_singleton_aliases))
-          m_bb.havoc(m_lfac.mkArraySingletonVar(a));
-        else
-          m_bb.havoc(m_lfac.mkArrayVar(a));
-      }
-    }
+  	if (callee->isIntrinsic()) {
+    	if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I)) {
+      	doMemIntrinsic(*MI);
+		}
+		else {
+			if (DoesCallSiteReturn(I, m_params) && ShouldCallSiteReturn(I, m_params)) {
+				// -- havoc return value of the intrinsics
+				crab_lit_ref_t lhs = m_lfac.getLit(I);
+				assert(lhs && lhs->isVar());
+				havoc(lhs->getVar(), m_bb, m_params.include_useless_havoc);
+			}
+		}
+		return;
+  	}
 
-    // XXX: if we return here we skip the callsite. This is fine
-    //      unless there exists an analysis which cares about
-    //      external calls.
-    //
-    //      Note: if we want to add the callsite make sure we add
-    //      the prototype for the external function below.
-    //
-    return;
-  }
+  	if ((callee->isDeclaration() || callee->isVarArg() || !m_params.interprocedural) && !isClamStmt(*callee)){
+		/**
+		 * If external or we don't perform inter-procedural reasoning
+		 * then we make sure all modified arrays and return value of
+		 * the callsite are havoc'ed.
+		 * 
+		 * TODOX: version for memory ssa form, otherwise results can be
+		 * unsound.  There is currently an implicit assumption that memory
+		 * ssa can be only used when the program has been fully inlined.
+		 **/
 
-  /**
-   * Translate a LLVM callsite
-   *     o := foo(i1,...,i_n)
-   *
-   * into a crab callsite
-   *     (o,a_o1,...,a_om) := foo(i1,...,in,a_i1,...,a_in) where
-   *
-   *    - a_i1,...,a_in are read-only and modified arrays by foo.
-   *    - a_o1,...,a_om are modified and new arrays created inside foo.
-   *
-   * TODOX: version for memory ssa form
-   **/
+		// -- havoc return value
+		if (DoesCallSiteReturn(I, m_params) && ShouldCallSiteReturn(I, m_params)) {
+			crab_lit_ref_t lhs = m_lfac.getLit(I);
+			assert(lhs && lhs->isVar());
+			havoc(lhs->getVar(), m_bb, m_params.include_useless_havoc);
+		}
+		// -- havoc all modified regions by the callee
+		if (m_lfac.get_track() == ARR) {
+			RegionVec mods = get_modified_regions(m_mem, I);
+			for (auto a : mods) {
+				if (get_singleton_value(a, m_params.lower_singleton_aliases))
+				m_bb.havoc(m_lfac.mkArraySingletonVar(a));
+				else
+				m_bb.havoc(m_lfac.mkArrayVar(a));
+			}
+		}
 
-  std::vector<var_t> inputs, outputs;
+		// XXX: if we return here we skip the callsite. This is fine
+		//      unless there exists an analysis which cares about
+		//      external calls.
+		//
+		//      Note: if we want to add the callsite make sure we add
+		//      the prototype for the external function below.
+		//
+		return;
+	}
 
-  // -- add the actual parameters of the llvm callsite: i1,...in.
-  for (auto &a : llvm::make_range(CS.arg_begin(), CS.arg_end())) {
-    Value *v = a.get();
-    if (!isTracked(*v, m_params))
-      continue;
-    inputs.push_back(normalizeFuncParamOrRet(*v, m_bb, m_lfac));
-  }
+	/**
+	 * Translate a LLVM callsite
+	 *     o := foo(i1,...,i_n)
+	 *
+	 * into a crab callsite
+	 *     (o,a_o1,...,a_om) := foo(i1,...,in,a_i1,...,a_in) where
+	 *
+	 *    - a_i1,...,a_in are read-only and modified arrays by foo.
+	 *    - a_o1,...,a_om are modified and new arrays created inside foo.
+	 *
+	 * TODOX: version for memory ssa form
+	 **/
 
-  // -- add the return value of the llvm calliste: o
-  if (ShouldCallSiteReturn(I, m_params)) {
-    if (DoesCallSiteReturn(I, m_params)) {
-      crab_lit_ref_t ret = m_lfac.getLit(I);
-      assert(ret && ret->isVar());
-      outputs.push_back(ret->getVar());
-    } else {
-      // The callsite should return something to match with the
-      // function signature but it doesn't: we create a fresh
-      // return value.
-      Type *RT = callee->getReturnType();
-      if (isBool(RT)) {
-        var_t fresh_ret = m_lfac.mkBoolVar();
-        outputs.push_back(fresh_ret);
-      } else if (isInteger(RT)) {
-        unsigned bitwidth = RT->getIntegerBitWidth();
-        var_t fresh_ret = m_lfac.mkIntVar(bitwidth);
-        outputs.push_back(fresh_ret);
-      } else if (isPointer(RT, m_params)) {
-        var_t fresh_ret = m_lfac.mkPtrVar();
-        outputs.push_back(fresh_ret);
-      } else {
-        // do nothing
-      }
-    }
-  } else {
-    if (DoesCallSiteReturn(I, m_params)) {
-      // LLVM shouldn't allow this.
-      CLAM_ERROR(
-          "Unexpected type mismatch between callsite and function signature");
-    }
-  }
+	std::vector<var_t> inputs, outputs;
 
-  if (m_lfac.get_track() == ARR) {
-    // -- add the input and output array parameters a_i1,...,a_in
-    // -- and a_o1,...,a_om.
-    RegionVec onlyreads = get_read_only_regions(m_mem, I);
-    RegionVec mods = get_modified_regions(m_mem, I);
-    RegionVec news = get_new_regions(m_mem, I);
+	// -- add the actual parameters of the llvm callsite: i1,...in.
+	for (auto &a : llvm::make_range(CS.arg_begin(), CS.arg_end())) {
+		Value *v = a.get();
+		if (!isTracked(*v, m_params))
+			continue;
+		inputs.push_back(normalizeFuncParamOrRet(*v, m_bb, m_lfac));
+	}
 
-    CRAB_LOG("cfg-mem", llvm::errs()
-                            << "Callsite " << I << "\n"
-                            << "\tOnly-Read regions " << onlyreads.size()
-                            << ": " << onlyreads << "\n"
-                            << "\tModified regions " << mods.size() << ": "
-                            << mods << "\n"
-                            << "\tNew regions " << news.size() << ": " << news
-                            << "\n");
+	// -- add the return value of the llvm calliste: o
+	if (ShouldCallSiteReturn(I, m_params)) {
+		if (DoesCallSiteReturn(I, m_params)) {
+			crab_lit_ref_t ret = m_lfac.getLit(I);
+			assert(ret && ret->isVar());
+			outputs.push_back(ret->getVar());
+		}
+		else {
+			// The callsite should return something to match with the
+			// function signature but it doesn't: we create a fresh
+			// return value.
+			Type *RT = callee->getReturnType();
+			if (isBool(RT)) {
+				var_t fresh_ret = m_lfac.mkBoolVar();
+				outputs.push_back(fresh_ret);
+			}
+			else if (isInteger(RT)) {
+				unsigned bitwidth = RT->getIntegerBitWidth();
+				var_t fresh_ret = m_lfac.mkIntVar(bitwidth);
+				outputs.push_back(fresh_ret);
+			}
+			else if (isPointer(RT, m_params)) {
+				var_t fresh_ret = m_lfac.mkPtrVar();
+				outputs.push_back(fresh_ret);
+			}
+			else {
+				// do nothing
+			}
+		}
+	}
+	else {
+		if (DoesCallSiteReturn(I, m_params)) {
+			// LLVM shouldn't allow this.
+			CLAM_ERROR("Unexpected type mismatch between callsite and function signature");
+		}
+	}
 
-    // -- add only read regions as array input parameters
-    for (auto a : onlyreads) {
-      if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-        // Promote the global to a scalar
-        inputs.push_back(m_lfac.mkArraySingletonVar(a));
-      } else {
-        inputs.push_back(m_lfac.mkArrayVar(a));
-      }
-    }
+	if (m_lfac.get_track() == ARR) {
+		// -- add the input and output array parameters a_i1,...,a_in
+		// -- and a_o1,...,a_om.
+		RegionVec onlyreads = get_read_only_regions(m_mem, I);
+		RegionVec mods = get_modified_regions(m_mem, I);
+		RegionVec news = get_new_regions(m_mem, I);
 
-    // -- add modified regions as both input and output parameters
-    for (auto a : mods) {
-      if (std::find(news.begin(), news.end(), a) != news.end()) {
-        continue;
-      }
+		CRAB_LOG("cfg-mem", llvm::errs()
+								<< "Callsite " << I << "\n"
+								<< "\tOnly-Read regions " << onlyreads.size()
+								<< ": " << onlyreads << "\n"
+								<< "\tModified regions " << mods.size() << ": "
+								<< mods << "\n"
+								<< "\tNew regions " << news.size() << ": " << news
+								<< "\n");
 
-      // input version
-      if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-        // Promote the global to a scalar
-        inputs.push_back(m_lfac.mkArraySingletonVar(a));
-      } else {
-        inputs.push_back(m_lfac.mkArrayVar(a));
-      }
+		// -- add only read regions as array input parameters
+		for (auto a : onlyreads) {
+			if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+				// Promote the global to a scalar
+				inputs.push_back(m_lfac.mkArraySingletonVar(a));
+			}
+			else {
+				inputs.push_back(m_lfac.mkArrayVar(a));
+			}
+		}
 
-      // output version
-      if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-        // Promote the global to a scalar
-        outputs.push_back(m_lfac.mkArraySingletonVar(a));
-      } else {
-        outputs.push_back(m_lfac.mkArrayVar(a));
-      }
-    }
-    // -- add more output parameters
-    for (auto a : news) {
-      outputs.push_back(m_lfac.mkArrayVar(a));
-    }
-  }
-  // -- Finally, add the callsite
-  m_bb.callsite(callee->getName().str(), outputs, inputs);
+		// -- add modified regions as both input and output parameters
+		for (auto a : mods) {
+			if (std::find(news.begin(), news.end(), a) != news.end()) {
+				continue;
+			}
+
+			// input version
+			if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+				// Promote the global to a scalar
+				inputs.push_back(m_lfac.mkArraySingletonVar(a));
+			}
+			else {
+				inputs.push_back(m_lfac.mkArrayVar(a));
+			}
+
+			// output version
+			if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+				// Promote the global to a scalar
+				outputs.push_back(m_lfac.mkArraySingletonVar(a));
+			}
+			else {
+				outputs.push_back(m_lfac.mkArrayVar(a));
+			}
+		}
+		// -- add more output parameters
+		for (auto a : news) {
+			outputs.push_back(m_lfac.mkArrayVar(a));
+		}
+	}
+	// -- Finally, add the callsite
+	m_bb.callsite(callee->getName().str(), outputs, inputs);
 }
 
 void CrabInstVisitor::visitUnreachableInst(UnreachableInst &I) {

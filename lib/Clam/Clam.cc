@@ -685,6 +685,12 @@ namespace clam {
 						Dom inv;
 						runClamPrintFunction(pre, bb, llvm_bb->getContext());
 					}
+					else if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_var_tags"){
+						const llvm::BasicBlock *llvm_bb = It->getParent();
+						basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
+						basic_block_t &bb = get_cfg().get_node(bb_label);
+						bb.dump();
+					}
 				}
 			}
 

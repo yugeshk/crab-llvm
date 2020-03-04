@@ -85,7 +85,11 @@ bool isNotAssumeFn(const llvm::Function &F);
 
 bool isVerifierCall(const llvm::Function &F);
 
-bool isPrintFn(const llvm::Function &F);
+bool isClamStmt(const llvm::Function &F);
+
+bool isClamPrintFn(const llvm::Function &F);
+
+bool isClamVarTagsFn(const llvm::Function &F);
 
 bool isZeroInitializer(const llvm::Function &F);
 
