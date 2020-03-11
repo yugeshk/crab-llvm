@@ -13,7 +13,16 @@ FROM seahorn/seahorn-build-llvm5:$UBUNTU
 
 # Needed to run clang with -m32
 RUN apt-get update && \
-    apt-get install -yqq libc6-dev-i386 
+    apt-get install -yqq libc6-dev-i386 && \
+    apt-get install -yqq libboost-all-dev
+
+RUN cd / && git clone https://github.com/antoinemine/apron && mkdir -p /apron/install
+WORKDIR /apron
+RUN ./configure -prefix /apron/install -no-ppl && \ 
+    make && \ 
+    make install && \
+    echo "/apron/install/lib" >> /etc/ld.so.conf && \
+    ldconfig 
 
 RUN cd / && rm -rf /clam && \
     git clone https://github.com/seahorn/crab-llvm clam --depth=10 ; \
@@ -50,7 +59,6 @@ RUN cmake --build . --target test-simple
 RUN cmake --build . --target test-readme
 RUN cmake --build . --target test-ssh-simplified
 RUN cmake --build . --target test-ntdrivers-simplified
-
 
 WORKDIR /clam
 
