@@ -39,12 +39,12 @@ RUN cmake -GNinja \
           -DCMAKE_CXX_COMPILER=g++-5 \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
           -DCRAB_USE_LDD=ON \
-          -DCRAB_USE_APRON=ON \
+          -DCRAB_USE_ELINA=ON \
           ../ && \
     cmake --build . --target extra  && cmake .. && \
     cmake --build . --target crab  && cmake .. && \
     cmake --build . --target ldd  && cmake .. && \
-    cmake --build . --target apron  && cmake .. && \
+    cmake --build . --target elina  && cmake .. && \
     cmake --build . --target install
 
 # symlink clang (from base image)
@@ -53,6 +53,9 @@ RUN ln -s /clang-5.0/bin/clang++ run/bin/clang++
 
 ENV PATH "/deps/LLVM-5.0.2-Linux/bin:$PATH"
 ENV PATH "/clam/build/run/bin:$PATH"
+
+#run dynamic linked for shared objects that were possibly not found
+RUN ldconfig -v /clam/build/run/lib
 
 # run tests
 RUN cmake --build . --target test-simple
