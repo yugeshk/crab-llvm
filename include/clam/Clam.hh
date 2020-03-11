@@ -94,6 +94,9 @@ namespace clam {
 
     template<typename AbsDomain>
     void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
+
+    template<typename AbsDomain>
+    void runClamVarTags(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
     
     /**
      * Compute strongest post-condition of an acyclic path.

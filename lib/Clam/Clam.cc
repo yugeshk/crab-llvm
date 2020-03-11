@@ -489,6 +489,28 @@ namespace clam {
 			}
 		}
 	}
+
+	template<typename AbsDomain>
+	void runClamVarTags(AbsDomain inv, basic_block_t& bb, const LLVMContext &ctx){
+		typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
+		abs_tr_t vis(inv);
+		bb.dump(); //This is the crab basic block where the print_var_tags 
+		for(auto &s: bb){
+			AbsDomain next_inv = std::move(vis.get_abs_value()); //next_inv is the invariant that holds just before executing s
+			if(s.is_clam_var_tags()){ 
+				llvm::outs() << "Invariants projected to certain variables\n";
+				auto &s1 = dynamic_cast<crab::cfg::callsite_stmt<ikos::z_number, llvm_variable_factory::varname_t>&>(s);
+				next_inv.project(s1.get_args());
+				//Now we print out the projected constraints here
+				auto csts = next_inv.to_linear_constraint_system();
+				csts.dump();
+				llvm::outs() << "\n";
+			}
+			else{
+				s.accept(&vis); //propagate invariant one step forward
+			}
+		}
+	}
     
     bool pathAnalyze(const AnalysisParams& params, const std::vector<const llvm::BasicBlock*>& blocks, bool layered_solving, 
 		std::vector<crab::cfg::statement_wrapper>& core, bool populate_inv_map, invariant_map_t& post) const { 
@@ -688,8 +710,10 @@ namespace clam {
 					else if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_var_tags"){
 						const llvm::BasicBlock *llvm_bb = It->getParent();
 						basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
+						auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
 						basic_block_t &bb = get_cfg().get_node(bb_label);
-						bb.dump();
+						Dom inv;
+						runClamVarTags(pre, bb, llvm_bb->getContext());
 					}
 				}
 			}
@@ -1421,13 +1445,6 @@ namespace clam {
       	}
     }
 
-	//Now that analysis is over, we can look for our print statements
-	// for (auto &F: M){
-	// 	if(!CrabInter && isTrackable(F)){
-	// 		runClamFunction(F);
-	// 	}
-	// }
-
     if (CrabStats) {
       crab::CrabStats::PrintBrunch(crab::outs());
     }
@@ -1465,27 +1482,6 @@ namespace clam {
     IntraClam_Impl crab(F, *m_cfg_builder_man);
     AnalysisResults results = { m_pre_map, m_post_map, m_infeasible_edges, m_checks_db};
     crab.Analyze(m_params, &F.getEntryBlock(), assumption_map_t(), results);
-
-	//Print linear constraints here
-	// typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
-	// for(inst_iterator It = inst_begin(F), E = inst_end(F); It != E; ++It){
-	// 	if(It->getOpcode() == 56){ //This is a call instruction
-	// 		if(It->getName() == "@__CLAM_print_lin_cst()"){ //This is our required instruction check
-	// 			llvm::BasicBlock *llvm_bb = It->getParent();
-	// 			//clam::wrapper_dom_ptr pre = clam::lookup(results.m_pre_map, llvm_bb, std::vector<varname_t>());
-	// 			auto pre = get_pre(llvm_bb, true);
-	// 			switch(pre->getId()){
-	// 				case GenericAbsDomWrapper::intv:{
-	//   					interval_domain_t inv;
-	//   					getAbsDomWrappee(pre, inv);
-	// 			}
-	// 			abs_tr_t vis(inv);
-	// 			basic_block_label_t bb_label =
-
-	// 			for(auto &s: )
-	// 		}
-	// 	}
-	// }
     return false;
   }
   
