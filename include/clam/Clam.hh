@@ -91,6 +91,12 @@ namespace clam {
      **/    
     void analyze(AnalysisParams &params, const llvm::BasicBlock *entry,
 		 const assumption_map_t &assumptions);
+
+    template<typename AbsDomain>
+    void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
+
+    template<typename AbsDomain>
+    void runClamVarTags(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
     
     /**
      * Compute strongest post-condition of an acyclic path.
@@ -215,7 +221,11 @@ namespace clam {
     std::unique_ptr<CrabBuilderManager> m_cfg_builder_man;
     checks_db_t m_checks_db; 
     AnalysisParams m_params;
-    
+  
+  // private:
+
+  //   bool runClamFunction(llvm::Function &F);
+
    public:
 
     static char ID;        

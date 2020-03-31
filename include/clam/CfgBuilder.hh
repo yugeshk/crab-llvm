@@ -22,8 +22,8 @@ namespace llvm {
 }
 
 namespace clam {
-  class HeapAbstraction;
-  class CfgBuilderImpl;
+	class HeapAbstraction;
+  	class CfgBuilderImpl;
 }
 
 namespace sea_dsa {
