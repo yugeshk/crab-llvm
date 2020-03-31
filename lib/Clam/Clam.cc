@@ -756,7 +756,7 @@ namespace clam {
       std::function<void(const AnalysisParams&,
 			 const BasicBlock*,
 			 const assumption_map_t&,
-			 liveness_t*,
+			 const liveness_t*,
 			 AnalysisResults&)> analyze;
       std::string name;
     };
@@ -929,28 +929,24 @@ namespace clam {
       
       /* Compute liveness information and choose statically the
 	 abstract domain */
+
       if (params.run_liveness || isRelationalDomain(absdom)) {
 	unsigned max_live_per_blk = 0;
 	for (auto cg_node: llvm::make_range(vertices(*m_cg))) {
-	  auto cfg_ref = cg_node.get_cfg();
-          CRAB_VERBOSE_IF(1,
-			  auto fdecl = cfg_ref.get_func_decl();            
-			  crab::get_msg_stream() << "Running liveness analysis for " 
-			                << fdecl.get_func_name() << "  ...\n";);
-	  liveness_t* live = new liveness_t(cfg_ref);
-          live->exec();
-          CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished liveness analysis.\n";);
-          // some stats
-          unsigned total_live, max_live_per_blk_, avg_live_per_blk;
-          live->get_stats(total_live, max_live_per_blk_, avg_live_per_blk);
-          max_live_per_blk = std::max(max_live_per_blk, max_live_per_blk_);
-          CRAB_VERBOSE_IF(1,
-		    crab::outs() << "-- Max number of out live vars per block=" 
-                                 << max_live_per_blk_ << "\n";
-		    crab::outs() << "-- Avg number of out live vars per block=" 
-                                 << avg_live_per_blk << "\n";);
-          crab::CrabStats::count_max("Liveness.count.maxOutVars",
-				      max_live_per_blk);
+	  const liveness_t* live = nullptr;
+
+	  // Get the cfg builder to run liveness
+	  if (const Function *fun = m_M.getFunction(cg_node.name())) {
+	    auto cfg_builder = m_crab_builder_man.get_cfg_builder(*fun);
+	    assert(cfg_builder);
+	    // run liveness
+	    cfg_builder->compute_live_symbols();
+	    live = cfg_builder->get_live_symbols();
+	    // update max number of live variables for whole cg
+	    unsigned total_live, max_live_per_blk_, avg_live_per_blk;
+	    live->get_stats(total_live, max_live_per_blk_, avg_live_per_blk);
+	    max_live_per_blk = std::max(max_live_per_blk, max_live_per_blk_);
+	  }
 
 	  if (isRelationalDomain(absdom)) {
 	    // FIXME: the selection of the final domain is fixed for the
@@ -963,19 +959,17 @@ namespace clam {
 		                   << max_live_per_blk << "\n"
 		                   << "Threshold: "
 		                   << params.relational_threshold << "\n");
-#ifdef HAVE_ALL_DOMAINS	  	    
+            #ifdef HAVE_ALL_DOMAINS	  	    
 	    if (max_live_per_blk > params.relational_threshold) {
 	      // default domain
 	      absdom = INTERVALS;
 	    }
-#endif 	    
+            #endif 	    
 	  }
 	  
 	  if (params.run_liveness) {
-	    m_live_map.insert(std::make_pair(cfg_ref, live));	    
-	  } else {
-	    delete live;
-	  }
+	    m_live_map.insert({cg_node.get_cfg(), live});	    
+	  } 
 	} // end for
       }
       
@@ -1009,13 +1003,6 @@ namespace clam {
 	  }
 	}
 #endif 	
-      }
-      
-      // free liveness map
-      if (params.run_liveness) {
-        for (auto &p : m_live_map) {
-          delete p.second;
-	}
       }
     }
     
@@ -1212,7 +1199,7 @@ namespace clam {
       , { BOXES,
 	  { bind_this(this, &InterClam_Impl::analyzeCg<boxes_domain_t>), "boxes" }}
       , { PK,
-	  { bind_this(this, &InterClam_Impl::analyzeCg<pk_domain_t>), "pk" }}	
+	  { bind_this(this, &InterClam_Impl::analyzeCg<pk_domain_t>), "pk" }}
       #endif
       #endif 	
     };    
@@ -1336,10 +1323,10 @@ namespace clam {
     
     CrabBuilderParams params(CrabTrackLev, CrabCFGSimplify, true,
 			     CrabEnableUniqueScalars, CrabMemShadows, 
-			     CrabIncludeHavoc,
+			     CrabIncludeHavoc, CrabUseArraySmashing,
 			     CrabArrayInit, CrabUnsoundArrayInit,
 			     CrabEnableBignums, CrabPrintCFG);
-
+    
     auto &tli = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
 
     /// Create the CFG builder manager
@@ -1352,7 +1339,7 @@ namespace clam {
         #ifdef HAVE_DSA
 	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Started llvm-dsa analysis\n";);
 	mem.reset
-	  (new LlvmDsaHeapAbstraction(M,&getAnalysis<SteensgaardDataStructures>(),
+	  (new LlvmDsaHeapAbstraction(M,&getAnalysis<SteensgaardDataStructures>(), 
 				      CrabDsaDisambiguateUnknown,
 				      CrabDsaDisambiguatePtrCast,
 				      CrabDsaDisambiguateExternal));
@@ -1371,6 +1358,7 @@ namespace clam {
 	mem.reset
 	  (new LegacySeaDsaHeapAbstraction(M, cg, dl, tli, *allocWrapInfo,
 					   (CrabHeapAnalysis == heap_analysis_t::CS_SEA_DSA),
+					   CrabUseArraySmashing,
 					   CrabDsaDisambiguateUnknown,
 					   CrabDsaDisambiguatePtrCast,
 					   CrabDsaDisambiguateExternal));
@@ -1486,22 +1474,28 @@ namespace clam {
   }
   
   void ClamPass::getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.setPreservesAll();
+    bool runSeaDsa = false;
     
-    #ifdef HAVE_DSA
+    AU.setPreservesAll();
     if (!CrabMemShadows &&
 	CrabHeapAnalysis == heap_analysis_t::LLVM_DSA) {
-      // don't run llvm-dsa unless llvm-dsa is used
+#ifdef HAVE_DSA
       AU.addRequiredTransitive<SteensgaardDataStructures>();
+#else
+      runSeaDsa = true;
+#endif       
     }
-    #endif 
     AU.addRequired<TargetLibraryInfoWrapperPass>();
-    if (!CrabMemShadows &&
-	(CrabHeapAnalysis == heap_analysis_t::CI_SEA_DSA ||
-	 CrabHeapAnalysis == heap_analysis_t::CS_SEA_DSA)) {
-      // don't run the pass unless sea-dsa uses it 
+
+    if (!runSeaDsa) {
+      runSeaDsa = (CrabHeapAnalysis == heap_analysis_t::CI_SEA_DSA ||
+		   CrabHeapAnalysis == heap_analysis_t::CS_SEA_DSA);
+    }
+    
+    if (!CrabMemShadows && runSeaDsa) {
       AU.addRequired<sea_dsa::AllocWrapInfo>();
-    } 
+    }
+    
     if (CrabMemShadows) {
       AU.addRequired<sea_dsa::ShadowMemPass>();
     }
