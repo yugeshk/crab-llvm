@@ -54,13 +54,15 @@ ENV PATH "/deps/LLVM-5.0.2-Linux/bin:$PATH"
 ENV PATH "/clam/build/run/bin:$PATH"
 
 #run dynamic linked for shared objects that were possibly not found
-RUN ldconfig -v /clam/build/run/lib /apron/install/lib
+RUN ldconfig -v /clam/build/run/lib /clam/build/run/elina/lib /apron/install/lib 
 
 # run tests
 RUN cmake --build . --target test-simple
 RUN cmake --build . --target test-readme
 RUN cmake --build . --target test-ssh-simplified
 RUN cmake --build . --target test-ntdrivers-simplified
+
+
 
 WORKDIR /clam
 
