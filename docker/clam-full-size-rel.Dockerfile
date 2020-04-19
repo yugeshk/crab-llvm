@@ -16,13 +16,11 @@ RUN apt-get update && \
     apt-get install -yqq libc6-dev-i386 && \
     apt-get install -yqq libboost-all-dev
 
-RUN cd / && git clone https://github.com/antoinemine/apron && mkdir -p /apron/install
+RUN cd / && git clone https://github.com/antoinemine/apron.git && mkdir -p /apron/install
 WORKDIR /apron
 RUN ./configure -prefix /apron/install -no-ppl && \ 
     make && \ 
-    make install && \
-    echo "/apron/install/lib" >> /etc/ld.so.conf && \
-    ldconfig 
+    make install
 
 ARG BRANCH
 RUN cd / && rm -rf /clam && \
@@ -56,7 +54,7 @@ ENV PATH "/deps/LLVM-5.0.2-Linux/bin:$PATH"
 ENV PATH "/clam/build/run/bin:$PATH"
 
 #run dynamic linked for shared objects that were possibly not found
-RUN ldconfig -v /clam/build/run/lib
+RUN ldconfig -v /clam/build/run/lib /apron/install/lib
 
 # run tests
 RUN cmake --build . --target test-simple
