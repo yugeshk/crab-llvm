@@ -191,7 +191,7 @@ bool isAssumeFn(const Function &F) {
 }
 
 bool isClamStmt(const Function &F) {
-  return(F.getName().substr(0, 7).equals("__CLAM"));
+  return(F.getName().startswith("__CLAM"));
 }
 
 bool isClamPrintFn(const Function &F){

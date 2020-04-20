@@ -477,7 +477,11 @@ namespace clam {
 		bb.dump(); //This is the crab basic block
 		for(auto &s: bb){
 			AbsDomain next_inv = std::move(vis.get_abs_value()); //next_inv is the invariant that holds just before executing s
-			if(s.is_clam_print()){ 
+			if(s.is_clam_print()){
+				// std::stringstream ss;
+				// ss << s.out_stream_buff().rdbuf();
+				// llvm::outs << "Call statement :: " << ss.str() << std::endl;
+
 				llvm::outs() << "Invariants as linear constraints\n";
 				auto csts = next_inv.to_linear_constraint_system();
 				//Now we print out the linear constraints here
