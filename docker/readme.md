@@ -1,7 +1,7 @@
 # Building Clam with Docker and running tests
 
 ```shell
-docker build --build-arg UBUNTU=bionic --build-arg BUILD_TYPE=Release -t clam_xenial_rel -f docker/clam-full-size-rel.Dockerfile .
+docker build --build-arg UBUNTU=bionic BRANCH=master --build-arg BUILD_TYPE=Release -t clam_xenial_rel -f docker/clam-full-size-rel.Dockerfile .
 docker run -v `pwd`:/host -it clam_xenial_rel"
 ```
 
