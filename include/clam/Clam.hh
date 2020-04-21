@@ -105,7 +105,7 @@ namespace clam {
     void analyze(AnalysisParams &params, const llvm::BasicBlock *entry,
 		 const lin_csts_map_t &assumptions);
 
-         template<typename AbsDomain>
+    template<typename AbsDomain>
     void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
 
     template<typename AbsDomain>
@@ -241,11 +241,7 @@ namespace clam {
     std::unique_ptr<CrabBuilderManager> m_cfg_builder_man;
     checks_db_t m_checks_db; 
     AnalysisParams m_params;
-  
-  // private:
-
-  //   bool runClamFunction(llvm::Function &F);
-
+    
    public:
 
     static char ID;        
@@ -315,5 +311,4 @@ namespace clam {
     void print_checks(llvm::raw_ostream &o) const;
   };
 
-} // end namespace 
-
+} // end namespace
