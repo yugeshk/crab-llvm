@@ -73,8 +73,6 @@ bool isIntArray(const llvm::Type &T);
 
 bool isAssertFn(const llvm::Function &F);
 
-bool isAssertFn(const llvm::Function &F);
-
 bool isSeaHornFail(const llvm::Function &F);
 
 bool isErrorFn(const llvm::Function &F);
@@ -83,17 +81,17 @@ bool isAssumeFn(const llvm::Function &F);
 
 bool isCrabIntrinsic(const llvm::Function &F);
 
-std::string getCrabIntrinsicName(const llvm::Function &F);  
-
-bool isNotAssumeFn(const llvm::Function &F);
-
-bool isVerifierCall(const llvm::Function &F);
+std::string getCrabIntrinsicName(const llvm::Function &F);
 
 bool isClamStmt(const llvm::Function &F);
 
 bool isClamPrintFn(const llvm::Function &F);
 
 bool isClamVarTagsFn(const llvm::Function &F);
+
+bool isNotAssumeFn(const llvm::Function &F);
+
+bool isVerifierCall(const llvm::Function &F);
 
 bool isZeroInitializer(const llvm::Function &F);
 

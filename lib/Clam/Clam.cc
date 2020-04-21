@@ -717,34 +717,33 @@ namespace clam {
 	results.checksdb += checker.get_all_checks();
 	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished assert checking.\n");      
       }
+	
+	llvm::outs() << "\n********* STARTING CUSTOM ANALYSIS **********\n";
 
-	  llvm::outs() << "\n********* STARTING CUSTOM ANALYSIS **********\n";
-  
-
-			//After everything is done, we will do out printing business
-			const Function *F = entry->getParent();
-			for(const_inst_iterator It = inst_begin(F), E = inst_end(F); It != E; ++It){
-				if(It->getOpcode() == 54){ //This is a call instruction
-					if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_lin_cst"){ //This is our required instruction check
-						const llvm::BasicBlock *llvm_bb = It->getParent();
-						basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
-						auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
-						basic_block_t &bb = get_cfg().get_node(bb_label);
-						Dom inv;
-						runClamPrintFunction(pre, bb, llvm_bb->getContext());
-					}
-					else if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_var_tags"){
-						const llvm::BasicBlock *llvm_bb = It->getParent();
-						basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
-						auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
-						basic_block_t &bb = get_cfg().get_node(bb_label);
-						Dom inv;
-						runClamVarTags(pre, bb, llvm_bb->getContext());
-					}
-				}
+	//After everything is done, we will do out printing business
+	const Function *F = entry->getParent();
+	for(const_inst_iterator It = inst_begin(F), E = inst_end(F); It != E; ++It){
+		if(It->getOpcode() == 54){ //This is a call instruction
+			if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_lin_cst"){ //This is our required instruction check
+				const llvm::BasicBlock *llvm_bb = It->getParent();
+				basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
+				auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
+				basic_block_t &bb = get_cfg().get_node(bb_label);
+				Dom inv;
+				runClamPrintFunction(pre, bb, llvm_bb->getContext());
 			}
+			else if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_var_tags"){
+				const llvm::BasicBlock *llvm_bb = It->getParent();
+				basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
+				auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
+				basic_block_t &bb = get_cfg().get_node(bb_label);
+				Dom inv;
+				runClamVarTags(pre, bb, llvm_bb->getContext());
+			}
+		}
+	}
 
-		llvm::outs() << "\n********* ENDING CUSTOM ANALYSIS **********\n";
+	llvm::outs() << "\n********* ENDING CUSTOM ANALYSIS **********\n";
 
       
       return;
@@ -1662,3 +1661,7 @@ namespace clam {
 
 static RegisterPass<clam::ClamPass> 
 X("clam", "Infer invariants using Crab", false, false);
+  
+   
+
+

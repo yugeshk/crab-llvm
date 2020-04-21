@@ -311,4 +311,5 @@ namespace clam {
     void print_checks(llvm::raw_ostream &o) const;
   };
 
-} // end namespace
+} // end namespace 
+

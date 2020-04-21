@@ -1369,118 +1369,107 @@ void CrabInstVisitor::doGlobalInitializer(CallInst &I) {
 
 /* special functions for verification */
 void CrabInstVisitor::doVerifierCall(CallInst &I) {
-	CallSite CS(&I);
+  CallSite CS(&I);
 
-  	const Value *calleeV = CS.getCalledValue();
-  	const Function *callee = dyn_cast<Function>(calleeV->stripPointerCasts());
-  	if (!callee)
-    	return;
+  const Value *calleeV = CS.getCalledValue();
+  const Function *callee = dyn_cast<Function>(calleeV->stripPointerCasts());
+  if (!callee)
+    return;
 
-  	if (isErrorFn(*callee)) {
-    	m_bb.assertion(lin_cst_t::get_false(), getDebugLoc(&I));
-    	return;
-  	}
+  if (isErrorFn(*callee)) {
+    m_bb.assertion(lin_cst_t::get_false(), getDebugLoc(&I));
+    return;
+  }
 
-  	if (isSeaHornFail(*callee)) {
-		// when seahorn inserts a call to "seahorn.fail" means that
-		// the program is safe iff the function cannot return.  Note
-		// that we cannot add "assert(false)" in the current
-		// block. Instead, we need to check whether the exit block of
-		// the function is reachable or not.
-		m_has_seahorn_fail = true;
-		return;
-	}
+  if (isSeaHornFail(*callee)) {
+    // when seahorn inserts a call to "seahorn.fail" means that
+    // the program is safe iff the function cannot return.  Note
+    // that we cannot add "assert(false)" in the current
+    // block. Instead, we need to check whether the exit block of
+    // the function is reachable or not.
+    m_has_seahorn_fail = true;
+    return;
+  }
 
-	if (!isAssertFn(*callee) && !isAssumeFn(*callee) && !isNotAssumeFn(*callee))
-		return;
+  if (!isAssertFn(*callee) && !isAssumeFn(*callee) && !isNotAssumeFn(*callee))
+    return;
 
-	Value *cond = CS.getArgument(0);
+  Value *cond = CS.getArgument(0);
 
-	if (!isTracked(*cond, m_params))
-    	return;
+  if (!isTracked(*cond, m_params))
+    return;
 
-	if (ConstantInt *CI = dyn_cast<ConstantInt>(cond)) {
-    	// -- cond is a constant
-    	bool is_bignum;
-    	z_number cond_val = getIntConstant(CI, m_params, is_bignum);
-    	if (!is_bignum) {
-      		if (cond_val > 0) {
-        		if (isAssertFn(*callee) || isAssumeFn(*callee)) {
-          		// do nothing
-        		}
-				else {
-          			assert(isNotAssumeFn(*callee));
-          			m_bb.assume(lin_cst_t::get_false());
-        		}
-      		}
-			else {
-        		if (isNotAssumeFn(*callee)) {
-          			// do nothing
-        		}
-				else if (isAssumeFn(*callee)) {
-          			m_bb.assume(lin_cst_t::get_false());
-        		}
-				else {
-          			assert(isAssertFn(*callee));
-          			m_bb.assertion(lin_cst_t::get_false(), getDebugLoc(&I));
-        		}
-      		}
-    	} //No else
-  	}
-	else {
-    	crab_lit_ref_t cond_ref = m_lfac.getLit(*cond);
-    	assert(cond_ref->isVar());
-    	var_t v = cond_ref->getVar();
-    	// -- cond is variable
-    	if (cond_ref->isBool()) {
-      		if (isNotAssumeFn(*callee))
-        		m_bb.bool_not_assume(v);
-      		else if (isAssumeFn(*callee))
-        		m_bb.bool_assume(v);
-      		else {
-        		assert(isAssertFn(*callee));
-        		m_bb.bool_assert(v, getDebugLoc(&I));
-      		}
-    	}
-		else if (cond_ref->isInt()) {
+  if (ConstantInt *CI = dyn_cast<ConstantInt>(cond)) {
+    // -- cond is a constant
+    bool is_bignum;
+    z_number cond_val = getIntConstant(CI, m_params, is_bignum);
+    if (!is_bignum) {
+      if (cond_val > 0) {
+        if (isAssertFn(*callee) || isAssumeFn(*callee)) {
+          // do nothing
+        } else {
+          assert(isNotAssumeFn(*callee));
+          m_bb.assume(lin_cst_t::get_false());
+        }
+      } else {
+        if (isNotAssumeFn(*callee)) {
+          // do nothing
+        } else if (isAssumeFn(*callee)) {
+          m_bb.assume(lin_cst_t::get_false());
+        } else {
+          assert(isAssertFn(*callee));
+          m_bb.assertion(lin_cst_t::get_false(), getDebugLoc(&I));
+        }
+      }
+    }
+  } else {
+    crab_lit_ref_t cond_ref = m_lfac.getLit(*cond);
+    assert(cond_ref->isVar());
+    var_t v = cond_ref->getVar();
+    // -- cond is variable
+    if (cond_ref->isBool()) {
+      if (isNotAssumeFn(*callee))
+        m_bb.bool_not_assume(v);
+      else if (isAssumeFn(*callee))
+        m_bb.bool_assume(v);
+      else {
+        assert(isAssertFn(*callee));
+        m_bb.bool_assert(v, getDebugLoc(&I));
+      }
+    } else if (cond_ref->isInt()) {
 
-      		ZExtInst *ZEI = dyn_cast<ZExtInst>(cond);
-      		if (ZEI && ZEI->getSrcTy()->isIntegerTy(1)) {
-				/* Special case to replace this pattern:
-					y:i32 = zext x:i1 to i32
-					assume (y>=1);
-				with
-					bool_assume(x);
-					This can help boolean/numerical propagation in the crab domains.
-				*/
-				cond_ref = m_lfac.getLit(*(ZEI->getOperand(0)));
-				assert(cond_ref->isVar()); // boolean variable
-				v = cond_ref->getVar();
-				if (isNotAssumeFn(*callee)) {
-					m_bb.bool_not_assume(v);
-				}
-				else if (isAssumeFn(*callee)) {
-					m_bb.bool_assume(v);
-				}
-				else {
-					assert(isAssertFn(*callee));
-					m_bb.bool_assert(v, getDebugLoc(&I));
-				}
-			}
-			else {
-				if (isNotAssumeFn(*callee)) {
-          			m_bb.assume(v <= number_t(0));
-        		}
-				else if (isAssumeFn(*callee)) {
-          			m_bb.assume(v >= number_t(1));
-        		}
-				else {
-          			assert(isAssertFn(*callee));
-          			m_bb.assertion(v >= number_t(1), getDebugLoc(&I));
-        		}
-      		}
-    	}
-  	}
+      ZExtInst *ZEI = dyn_cast<ZExtInst>(cond);
+      if (ZEI && ZEI->getSrcTy()->isIntegerTy(1)) {
+        /* Special case to replace this pattern:
+             y:i32 = zext x:i1 to i32
+             assume (y>=1);
+           with
+             bool_assume(x);
+             This can help boolean/numerical propagation in the crab domains.
+        */
+        cond_ref = m_lfac.getLit(*(ZEI->getOperand(0)));
+        assert(cond_ref->isVar()); // boolean variable
+        v = cond_ref->getVar();
+        if (isNotAssumeFn(*callee)) {
+          m_bb.bool_not_assume(v);
+        } else if (isAssumeFn(*callee)) {
+          m_bb.bool_assume(v);
+        } else {
+          assert(isAssertFn(*callee));
+          m_bb.bool_assert(v, getDebugLoc(&I));
+        }
+      } else {
+        if (isNotAssumeFn(*callee)) {
+          m_bb.assume(v <= number_t(0));
+        } else if (isAssumeFn(*callee)) {
+          m_bb.assume(v >= number_t(1));
+        } else {
+          assert(isAssertFn(*callee));
+          m_bb.assertion(v >= number_t(1), getDebugLoc(&I));
+        }
+      }
+    }
+  }
 }
 
 CrabInstVisitor::CrabInstVisitor(
@@ -2528,130 +2517,123 @@ void CrabInstVisitor::visitCallInst(CallInst &I) {
     return;
   }
 
-	/**
-	 * Translate a LLVM callsite
-	 *     o := foo(i1,...,i_n)
-	 *
-	 * into a crab callsite
-	 *     (o,a_o1,...,a_om) := foo(i1,...,in,a_i1,...,a_in) where
-	 *
-	 *    - a_i1,...,a_in are read-only and modified arrays by foo.
-	 *    - a_o1,...,a_om are modified and new arrays created inside foo.
-	 *
-	 * TODOX: version for memory ssa form
-	 **/
+  /**
+   * Translate a LLVM callsite or Crab intrinsic
+   *     o := foo(i1,...,i_n)
+   *
+   * into a crab callsite
+   *     (o,a_o1,...,a_om) := foo(i1,...,in,a_i1,...,a_in) where
+   *
+   *    - a_i1,...,a_in are read-only and modified arrays by foo.
+   *    - a_o1,...,a_om are modified and new arrays created inside foo.
+   *
+   * TODOX: version for memory ssa form
+   **/
 
-	std::vector<var_t> inputs, outputs;
+  std::vector<var_t> inputs, outputs;
 
-	// -- add the actual parameters of the llvm callsite: i1,...in.
-	for (auto &a : llvm::make_range(CS.arg_begin(), CS.arg_end())) {
-		Value *v = a.get();
-		if (!isTracked(*v, m_params))
-			continue;
-		inputs.push_back(normalizeFuncParamOrRet(*v, m_bb, m_lfac));
-	}
+  // -- add the actual parameters of the llvm callsite: i1,...in.
+  for (auto &a : llvm::make_range(CS.arg_begin(), CS.arg_end())) {
+    Value *v = a.get();
+    if (!isTracked(*v, m_params))
+      continue;
+    inputs.push_back(normalizeFuncParamOrRet(*v, m_bb, m_lfac));
+  }
 
-	// -- add the return value of the llvm calliste: o
-	if (ShouldCallSiteReturn(I, m_params)) {
-		if (DoesCallSiteReturn(I, m_params)) {
-			crab_lit_ref_t ret = m_lfac.getLit(I);
-			assert(ret && ret->isVar());
-			outputs.push_back(ret->getVar());
-		}
-		else {
-			// The callsite should return something to match with the
-			// function signature but it doesn't: we create a fresh
-			// return value.
-			Type *RT = callee->getReturnType();
-			if (isBool(RT)) {
-				var_t fresh_ret = m_lfac.mkBoolVar();
-				outputs.push_back(fresh_ret);
-			}
-			else if (isInteger(RT)) {
-				unsigned bitwidth = RT->getIntegerBitWidth();
-				var_t fresh_ret = m_lfac.mkIntVar(bitwidth);
-				outputs.push_back(fresh_ret);
-			}
-			else if (isPointer(RT, m_params)) {
-				var_t fresh_ret = m_lfac.mkPtrVar();
-				outputs.push_back(fresh_ret);
-			}
-			else {
-				// do nothing
-			}
-		}
-	}
-	else {
-		if (DoesCallSiteReturn(I, m_params)) {
-			// LLVM shouldn't allow this.
-			CLAM_ERROR("Unexpected type mismatch between callsite and function signature");
-		}
-	}
+  // -- add the return value of the llvm calliste: o
+  if (ShouldCallSiteReturn(I, m_params)) {
+    if (DoesCallSiteReturn(I, m_params)) {
+      crab_lit_ref_t ret = m_lfac.getLit(I);
+      assert(ret && ret->isVar());
+      outputs.push_back(ret->getVar());
+    } else {
+      // The callsite should return something to match with the
+      // function signature but it doesn't: we create a fresh
+      // return value.
+      Type *RT = callee->getReturnType();
+      if (isBool(RT)) {
+        var_t fresh_ret = m_lfac.mkBoolVar();
+        outputs.push_back(fresh_ret);
+      } else if (isInteger(RT)) {
+        unsigned bitwidth = RT->getIntegerBitWidth();
+        var_t fresh_ret = m_lfac.mkIntVar(bitwidth);
+        outputs.push_back(fresh_ret);
+      } else if (isPointer(RT, m_params)) {
+        var_t fresh_ret = m_lfac.mkPtrVar();
+        outputs.push_back(fresh_ret);
+      } else {
+        // do nothing
+      }
+    }
+  } else {
+    if (DoesCallSiteReturn(I, m_params)) {
+      // LLVM shouldn't allow this.
+      CLAM_ERROR(
+          "Unexpected type mismatch between callsite and function signature");
+    }
+  }
 
-	if (m_lfac.get_track() == ARR) {
-		// -- add the input and output array parameters a_i1,...,a_in
-		// -- and a_o1,...,a_om.
-		RegionVec onlyreads = get_read_only_regions(m_mem, I);
-		RegionVec mods = get_modified_regions(m_mem, I);
-		RegionVec news = get_new_regions(m_mem, I);
+  if (m_lfac.get_track() == ARR) {
+    // -- add the input and output array parameters a_i1,...,a_in
+    // -- and a_o1,...,a_om.
+    RegionVec onlyreads = get_read_only_regions(m_mem, I);
+    RegionVec mods = get_modified_regions(m_mem, I);
+    RegionVec news = get_new_regions(m_mem, I);
 
-		CRAB_LOG("cfg-mem", llvm::errs()
-								<< "Callsite " << I << "\n"
-								<< "\tOnly-Read regions " << onlyreads.size()
-								<< ": " << onlyreads << "\n"
-								<< "\tModified regions " << mods.size() << ": "
-								<< mods << "\n"
-								<< "\tNew regions " << news.size() << ": " << news
-								<< "\n");
+    CRAB_LOG("cfg-mem", llvm::errs()
+                            << "Callsite " << I << "\n"
+                            << "\tOnly-Read regions " << onlyreads.size()
+                            << ": " << onlyreads << "\n"
+                            << "\tModified regions " << mods.size() << ": "
+                            << mods << "\n"
+                            << "\tNew regions " << news.size() << ": " << news
+                            << "\n");
 
-		// -- add only read regions as array input parameters
-		for (auto a : onlyreads) {
-			if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-				// Promote the global to a scalar
-				inputs.push_back(m_lfac.mkArraySingletonVar(a));
-			}
-			else {
-				inputs.push_back(m_lfac.mkArrayVar(a));
-			}
-		}
+    // -- add only read regions as array input parameters
+    for (auto a : onlyreads) {
+      if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+        // Promote the global to a scalar
+        inputs.push_back(m_lfac.mkArraySingletonVar(a));
+      } else {
+        inputs.push_back(m_lfac.mkArrayVar(a));
+      }
+    }
 
-		// -- add modified regions as both input and output parameters
-		for (auto a : mods) {
-			if (std::find(news.begin(), news.end(), a) != news.end()) {
-				continue;
-			}
+    // -- add modified regions as both input and output parameters
+    for (auto a : mods) {
+      if (std::find(news.begin(), news.end(), a) != news.end()) {
+        continue;
+      }
 
-			// input version
-			if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-				// Promote the global to a scalar
-				inputs.push_back(m_lfac.mkArraySingletonVar(a));
-			}
-			else {
-				inputs.push_back(m_lfac.mkArrayVar(a));
-			}
+      // input version
+      if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+        // Promote the global to a scalar
+        inputs.push_back(m_lfac.mkArraySingletonVar(a));
+      } else {
+        inputs.push_back(m_lfac.mkArrayVar(a));
+      }
 
-			// output version
-			if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-				// Promote the global to a scalar
-				outputs.push_back(m_lfac.mkArraySingletonVar(a));
-			}
-			else {
-				outputs.push_back(m_lfac.mkArrayVar(a));
-			}
-		}
-		// -- add more output parameters
-		for (auto a : news) {
-			outputs.push_back(m_lfac.mkArrayVar(a));
-		}
-	}
-	// -- Finally, add the callsite or crab intrinsic
+      // output version
+      if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+        // Promote the global to a scalar
+        outputs.push_back(m_lfac.mkArraySingletonVar(a));
+      } else {
+        outputs.push_back(m_lfac.mkArrayVar(a));
+      }
+    }
+    // -- add more output parameters
+    for (auto a : news) {
+      outputs.push_back(m_lfac.mkArrayVar(a));
+    }
+  }
+
+  // -- Finally, add the callsite or crab intrinsic
   if (isCrabIntrinsic(*callee)) {
     m_bb.intrinsic(getCrabIntrinsicName(*callee), outputs, inputs);
   } else {
     m_bb.callsite(callee->getName().str(), outputs, inputs);
   }
 }
-
 
 void CrabInstVisitor::visitUnreachableInst(UnreachableInst &I) {
   m_bb.unreachable();
@@ -3025,347 +3007,349 @@ void CfgBuilderImpl::build_cfg() {
         CLAM_ERROR("UnifyFunctionExitNodes pass should be run first");
       }
 
-				ret_block = bb;
-				m_cfg->set_exit(ret_block->label());
-			
-				if (has_seahorn_fail) {
-					ret_block->assertion(lin_cst_t::get_false(), getDebugLoc(RI));
-				}
-				if (m_params.interprocedural) {
-					if (Value *RV = RI->getReturnValue()) {
-						if (isTracked(*RV, m_params)) {
-							ret_val = var_ref_t(normalizeFuncParamOrRet(*RV, *ret_block, m_lfac));
-							bb->ret(ret_val.get());
-						}
-					}
-				}
-			}
-			else {
-				std::vector<const BasicBlock *> succs_vector(succs(B).begin(), succs(B).end());
-				
-				// The default destination of a switch instruction does not count as a successor but we want to consider it as a such.
-				if (SwitchInst *SI = dyn_cast<SwitchInst>(B.getTerminator())) {
-					succs_vector.push_back(SI->getDefaultDest());
-				}
-				for (const BasicBlock *dst : succs_vector) {
-					// move branch condition in bb to a new block inserted between bb and dst
-					basic_block_t *mid_bb = exec_edge(B, *dst);
-					// phi nodes in dst are translated into assignments in the predecessor
-					CrabPhiVisitor v(m_lfac, m_mem, m_sm, *m_dl, (mid_bb ? *mid_bb : *bb), B, m_params);
-					v.visit(const_cast<BasicBlock &>(*dst));
-				}
-			}
-		}
+      ret_block = bb;
+      m_cfg->set_exit(ret_block->label());
+      if (has_seahorn_fail) {
+        ret_block->assertion(lin_cst_t::get_false(), getDebugLoc(RI));
+      }
+      if (m_params.interprocedural) {
+        if (Value *RV = RI->getReturnValue()) {
+          if (isTracked(*RV, m_params)) {
+            ret_val =
+                var_ref_t(normalizeFuncParamOrRet(*RV, *ret_block, m_lfac));
+            bb->ret(ret_val.get());
+          }
+        }
+      }
+    } else {
+      std::vector<const BasicBlock *> succs_vector(succs(B).begin(),
+                                                   succs(B).end());
+      // The default destination of a switch instruction does not
+      // count as a successor but we want to consider it as a such.
+      if (SwitchInst *SI = dyn_cast<SwitchInst>(B.getTerminator())) {
+        succs_vector.push_back(SI->getDefaultDest());
+      }
+      for (const BasicBlock *dst : succs_vector) {
+        // -- move branch condition in bb to a new block inserted
+        //    between bb and dst
+        basic_block_t *mid_bb = exec_edge(B, *dst);
 
-		/// Add function declaration
-		if (m_params.interprocedural && !m_func.isVarArg()) {
+        // -- phi nodes in dst are translated into assignments in
+        //    the predecessor
+        CrabPhiVisitor v(m_lfac, m_mem, m_sm, *m_dl,
+			 (mid_bb ? *mid_bb : *bb), B, m_params);
+        v.visit(const_cast<BasicBlock &>(*dst));
+      }
+    }
+  }
 
-			/**
-			 * Translate LLVM function declaration
-			 *   o_ty foo (i1,...,in)
-			 *
-			 * into a crab function declaration
-			 *
-			 *   o, a_o1,...,a_om foo (i1,...,in,a_i1,...,a_in) where
-			 *
-			 *   - o is the **returned value** of the function (translation
-			 *     ensures there is always one return instruction and the
-			 *     returned value is a variable, i.e., cannot be a
-			 *     constant).
-			 *
-			 *   - a_i1,...,a_in are read-only and modified arrays in function foo
-			 *
-			 *   - a_o1,....,a_om are modified and new arrays created inside
-			 *     foo.
-			 *
-			 * It ensures that the set {a_i1,...,a_in} is disjoint from
-			 * {a_o1,....,a_om}, otherwise crab will complain.
-			 *
-			 * TODOX: version for memory ssa form
-			 **/
+  /// Add function declaration
+  if (m_params.interprocedural && !m_func.isVarArg()) {
 
-			std::vector<var_t> inputs, outputs;
+    /**
+     * Translate LLVM function declaration
+     *   o_ty foo (i1,...,in)
+     *
+     * into a crab function declaration
+     *
+     *   o, a_o1,...,a_om foo (i1,...,in,a_i1,...,a_in) where
+     *
+     *   - o is the **returned value** of the function (translation
+     *     ensures there is always one return instruction and the
+     *     returned value is a variable, i.e., cannot be a
+     *     constant).
+     *
+     *   - a_i1,...,a_in are read-only and modified arrays in function foo
+     *
+     *   - a_o1,....,a_om are modified and new arrays created inside
+     *     foo.
+     *
+     * It ensures that the set {a_i1,...,a_in} is disjoint from
+     * {a_o1,....,a_om}, otherwise crab will complain.
+     *
+     * TODOX: version for memory ssa form
+     **/
 
-			basic_block_t &entry = m_cfg->get_node(m_cfg->entry());
+    std::vector<var_t> inputs, outputs;
 
-			if (ret_val.is_null()) {
-				// special case: function that do not return but in its signature it has a return type.
-				// E.g., "int foo() { unreachable; }"
-				const Type &RT = *m_func.getReturnType();
-				if (isTrackedType(RT, m_params)) {
-					if (isBool(&RT)) {
-					ret_val = var_ref_t(m_lfac.mkBoolVar());
-					} else if (isInteger(&RT)) {
-					unsigned bitwidth = RT.getIntegerBitWidth();
-					ret_val = var_ref_t(m_lfac.mkIntVar(bitwidth));
-					} else {
-					assert(RT.isPointerTy());
-					ret_val = var_ref_t(m_lfac.mkPtrVar());
-					}
-				}
-			}
+    basic_block_t &entry = m_cfg->get_node(m_cfg->entry());
 
-			// add the returned value of the llvm function: o
-			if (!ret_val.is_null()) {
-				outputs.push_back(ret_val.get());
-			}
+    if (ret_val.is_null()) {
+      // special case: function that do not return but in its
+      // signature it has a return type. E.g., "int foo() {
+      // unreachable; }"
+      const Type &RT = *m_func.getReturnType();
+      if (isTrackedType(RT, m_params)) {
+        if (isBool(&RT)) {
+          ret_val = var_ref_t(m_lfac.mkBoolVar());
+        } else if (isInteger(&RT)) {
+          unsigned bitwidth = RT.getIntegerBitWidth();
+          ret_val = var_ref_t(m_lfac.mkIntVar(bitwidth));
+        } else {
+          assert(RT.isPointerTy());
+          ret_val = var_ref_t(m_lfac.mkPtrVar());
+        }
+      }
+    }
 
-			// add input parameters i1,...,in
-			for (Value &arg : llvm::make_range(m_func.arg_begin(), m_func.arg_end())) {
-				if (!isTracked(arg, m_params))
-					continue;
+    // -- add the returned value of the llvm function: o
+    if (!ret_val.is_null()) {
+      outputs.push_back(ret_val.get());
+    }
 
-				crab_lit_ref_t i = m_lfac.getLit(arg);
-				assert(i && i->isVar());
-				if (!ret_val.is_null() && i->getVar() == ret_val.get()) {
-					// rename i to avoid having same name as output (crab requirement)
-					if (i->isBool()) {
-						var_t fresh_i = m_lfac.mkBoolVar();
-						entry.bool_assign(fresh_i, i->getVar());
-						inputs.push_back(fresh_i);
-					}
-					else if (i->isInt()) {
-						unsigned bitwidth = arg.getType()->getIntegerBitWidth();
-						var_t fresh_i = m_lfac.mkIntVar(bitwidth);
-						entry.assign(fresh_i, i->getVar());
-						inputs.push_back(fresh_i);
-					}
-					else if (i->isPtr()) {
-						var_t fresh_i = m_lfac.mkPtrVar();
-						entry.ptr_assign(fresh_i, i->getVar(), number_t(0));
-						inputs.push_back(fresh_i);
-					} 
-					else {
-						CLAM_ERROR("unexpected function parameter type");
-					}
-				}
-				else {
-					inputs.push_back(i->getVar());
-				}
-			}
+    // -- add input parameters i1,...,in
+    for (Value &arg : llvm::make_range(m_func.arg_begin(), m_func.arg_end())) {
+      if (!isTracked(arg, m_params))
+        continue;
 
-			if (m_lfac.get_track() == ARR && (!m_func.getName().equals("main"))) {
-				// add the input and output array parameters
-				RegionVec onlyreads = get_read_only_regions(m_mem, m_func);
-				RegionVec mods = get_modified_regions(m_mem, m_func);
-				RegionVec news = get_new_regions(m_mem, m_func);
+      crab_lit_ref_t i = m_lfac.getLit(arg);
+      assert(i && i->isVar());
+      if (!ret_val.is_null() && i->getVar() == ret_val.get()) {
+        // rename i to avoid having same name as output (crab requirement)
+        if (i->isBool()) {
+          var_t fresh_i = m_lfac.mkBoolVar();
+          entry.bool_assign(fresh_i, i->getVar());
+          inputs.push_back(fresh_i);
+        } else if (i->isInt()) {
+          unsigned bitwidth = arg.getType()->getIntegerBitWidth();
+          var_t fresh_i = m_lfac.mkIntVar(bitwidth);
+          entry.assign(fresh_i, i->getVar());
+          inputs.push_back(fresh_i);
+        } else if (i->isPtr()) {
+          var_t fresh_i = m_lfac.mkPtrVar();
+          entry.ptr_assign(fresh_i, i->getVar(), number_t(0));
+          inputs.push_back(fresh_i);
+        } else {
+          CLAM_ERROR("unexpected function parameter type");
+        }
+      } else {
+        inputs.push_back(i->getVar());
+      }
+    }
 
-				CRAB_LOG("cfg-mem", llvm::errs() << "Function " << m_func.getName()
-							<< "\n\tOnly-Read regions "
-								<< onlyreads.size() << ": " << onlyreads
-									<< "\n\tModified regions " << mods.size()
-										<< ": " << mods << "\n\tNew regions "
-											<< news.size() << ": " << news << "\n");
+    if (m_lfac.get_track() == ARR && (!m_func.getName().equals("main"))) {
+      // -- add the input and output array parameters
+      RegionVec onlyreads = get_read_only_regions(m_mem, m_func);
+      RegionVec mods = get_modified_regions(m_mem, m_func);
+      RegionVec news = get_new_regions(m_mem, m_func);
 
-				// add only read regions as input parameters
-				for (auto a : onlyreads) {
-					if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-						// Promote the global to a scalar
-						inputs.push_back(m_lfac.mkArraySingletonVar(a));
-					}
-					else {
-						inputs.push_back(m_lfac.mkArrayVar(a));
-					}
-				}
+      CRAB_LOG("cfg-mem", llvm::errs() << "Function " << m_func.getName()
+                                       << "\n\tOnly-Read regions "
+                                       << onlyreads.size() << ": " << onlyreads
+                                       << "\n\tModified regions " << mods.size()
+                                       << ": " << mods << "\n\tNew regions "
+                                       << news.size() << ": " << news << "\n");
 
-				// add input/output parameters
+      // -- add only read regions as input parameters
+      for (auto a : onlyreads) {
+        if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+          // Promote the global to a scalar
+          inputs.push_back(m_lfac.mkArraySingletonVar(a));
+        } else {
+          inputs.push_back(m_lfac.mkArrayVar(a));
+        }
+      }
 
-				for (auto a : mods) {
-					if (std::find(news.begin(), news.end(), a) != news.end()) {
-						continue;
-					}
-				
-					var_ref_t a_in;
+      // -- add input/output parameters
+      for (auto a : mods) {
+        if (std::find(news.begin(), news.end(), a) != news.end()) {
+          continue;
+        }
+        var_ref_t a_in;
 
-					// for each parameter `a` we create a fresh version
-					//    `a_in` where `a_in` acts as the input version of the
-					//    parameter and `a` is the output version. Note that the
-					//    translation of the function will not produce new
-					//    versions of `a` since all array stores overwrite `a`.
+        // -- for each parameter `a` we create a fresh version
+        //    `a_in` where `a_in` acts as the input version of the
+        //    parameter and `a` is the output version. Note that the
+        //    translation of the function will not produce new
+        //    versions of `a` since all array stores overwrite `a`.
 
-					/** Added in the entry block of the function **/
-					entry.set_insert_point_front();
-					if (const Value *v = get_singleton_value(a, m_params.lower_singleton_aliases)) {
-						// Promote the global to a scalar
-						Type *ty = cast<PointerType>(v->getType())->getElementType();
-						var_t s = m_lfac.mkArraySingletonVar(a);
-						if (isInteger(ty)) {
-							a_in = var_ref_t(m_lfac.mkIntVar(ty->getIntegerBitWidth()));
-							entry.assign(s, a_in.get());
-						}
-						else if (isBool(ty)) {
-							a_in = var_ref_t(m_lfac.mkBoolVar());
-							entry.bool_assign(s, a_in.get(), false);
-						}
-						else { /* unreachable */ }
-					}
-					else {
-						switch (a.getRegionInfo().get_type()) {
-							case INT_REGION:
-								a_in = var_ref_t(m_lfac.mkIntArrayVar(0 /*unknown bitwidth*/));
-								break;
-							case BOOL_REGION:
-								a_in = var_ref_t(m_lfac.mkBoolArrayVar());
-								break;
-							default: /*unreachable*/;
-						}
-						if (!a_in.is_null())
-							entry.array_assign(m_lfac.mkArrayVar(a), a_in.get());
-					}
+        /** Added in the entry block of the function **/
+        entry.set_insert_point_front();
+        if (const Value *v =
+                get_singleton_value(a, m_params.lower_singleton_aliases)) {
+          // Promote the global to a scalar
+          Type *ty = cast<PointerType>(v->getType())->getElementType();
+          var_t s = m_lfac.mkArraySingletonVar(a);
+          if (isInteger(ty)) {
+            a_in = var_ref_t(m_lfac.mkIntVar(ty->getIntegerBitWidth()));
+            entry.assign(s, a_in.get());
+          } else if (isBool(ty)) {
+            a_in = var_ref_t(m_lfac.mkBoolVar());
+            entry.bool_assign(s, a_in.get(), false);
+          } else { /* unreachable */
+          }
+        } else {
+          switch (a.getRegionInfo().get_type()) {
+          case INT_REGION:
+            a_in = var_ref_t(m_lfac.mkIntArrayVar(0 /*unknown bitwidth*/));
+            break;
+          case BOOL_REGION:
+            a_in = var_ref_t(m_lfac.mkBoolArrayVar());
+            break;
+          default: /*unreachable*/;
+            ;
+          }
+          if (!a_in.is_null())
+            entry.array_assign(m_lfac.mkArrayVar(a), a_in.get());
+        }
 
-					// input version
-					if (!a_in.is_null())
-						inputs.push_back(a_in.get());
+        // input version
+        if (!a_in.is_null())
+          inputs.push_back(a_in.get());
 
-					// output version
-					if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
-						// Promote the global to a scalar
-						outputs.push_back(m_lfac.mkArraySingletonVar(a));
-					}
-					else {
-						outputs.push_back(m_lfac.mkArrayVar(a));
-					}
-				}
+        // output version
+        if (get_singleton_value(a, m_params.lower_singleton_aliases)) {
+          // Promote the global to a scalar
+          outputs.push_back(m_lfac.mkArraySingletonVar(a));
+        } else {
+          outputs.push_back(m_lfac.mkArrayVar(a));
+        }
+      }
 
-				// add more output parameters
-				for (auto a : news) {
-					outputs.push_back(m_lfac.mkArrayVar(a));
-				}
-			}
+      // -- add more output parameters
+      for (auto a : news) {
+        outputs.push_back(m_lfac.mkArrayVar(a));
+      }
+    }
 
-			// Finally, we add the function declaration
+    // -- Finally, we add the function declaration
 
-			// Sanity check
-			std::vector<var_t> sorted_ins(inputs.begin(), inputs.end());
-			std::vector<var_t> sorted_outs(outputs.begin(), outputs.end());
-			std::sort(sorted_ins.begin(), sorted_ins.end());
-			std::sort(sorted_outs.begin(), sorted_outs.end());
-			std::vector<var_t> intersect;
-			std::set_intersection(sorted_ins.begin(), sorted_ins.end(), sorted_outs.begin(), sorted_outs.end(), std::back_inserter(intersect));
-			if (!intersect.empty()) {
-				crab::errs() << "INPUTS: {";
-				for (auto i : inputs) {
-					crab::outs() << i << ";";
-				}
-				crab::errs() << "}\n";
-				crab::errs() << "OUTPUTS: {";
-				for (auto o : outputs) {
-					crab::outs() << o << ";";
-				}
-				crab::errs() << "}\n";
-				CLAM_ERROR("function inputs and outputs should not intersect");
-			}
+    // Sanity check
+    std::vector<var_t> sorted_ins(inputs.begin(), inputs.end());
+    std::vector<var_t> sorted_outs(outputs.begin(), outputs.end());
+    std::sort(sorted_ins.begin(), sorted_ins.end());
+    std::sort(sorted_outs.begin(), sorted_outs.end());
+    std::vector<var_t> intersect;
+    std::set_intersection(sorted_ins.begin(), sorted_ins.end(),
+                          sorted_outs.begin(), sorted_outs.end(),
+                          std::back_inserter(intersect));
+    if (!intersect.empty()) {
+      crab::errs() << "INPUTS: {";
+      for (auto i : inputs) {
+        crab::outs() << i << ";";
+      }
+      crab::errs() << "}\n";
+      crab::errs() << "OUTPUTS: {";
+      for (auto o : outputs) {
+        crab::outs() << o << ";";
+      }
+      crab::errs() << "}\n";
+      CLAM_ERROR("function inputs and outputs should not intersect");
+    }
 
-			typedef function_decl<number_t, varname_t> function_decl_t;
-			m_cfg->set_func_decl(function_decl_t(m_func.getName().str(), inputs, outputs));
-		}
-		else {
-			////
-			// Intra-procedural case:
-			///
-			/**
-			 * TODO: we should havoc all inputs of the procedure to play safe
-			 * but we don't do it because the crab array domains doesn't need
-			 * that to be sound.
-			**/
-		}
+    typedef function_decl<number_t, varname_t> function_decl_t;
+    m_cfg->set_func_decl(
+        function_decl_t(m_func.getName().str(), inputs, outputs));
+  } else {
+    ////
+    // Intra-procedural case:
+    ///
+    /**
+     * TODO: we should havoc all inputs of the procedure to play safe
+     * but we don't do it because the crab array domains doesn't need
+     * that to be sound.
+    **/
+  }
 
-		if (m_cfg->has_exit()) {
-			// 	  Connect all sink blocks with an unreachable instruction to
-			//    the exit block.  For a forward analysis this doesn't have
-			//    any impact since unreachable becomes bottom anyway.
-			//    However, a backward analysis starting with an invariant that
-			//    says the exit is unreachable may incorrectly infer that the
-			//    preconditions of the error states is false just because it
-			//    never propagates backwards from these special sink blocks.
-			basic_block_t &exit = m_cfg->get_node(m_cfg->exit());
-			for (auto &B : m_func) {
-				if (basic_block_t *b = lookup(B)) {
-					if (b->label() == m_cfg->exit())
-					continue;
+  if (m_cfg->has_exit()) {
+    // -- Connect all sink blocks with an unreachable instruction to
+    //    the exit block.  For a forward analysis this doesn't have
+    //    any impact since unreachable becomes bottom anyway.
+    //    However, a backward analysis starting with an invariant that
+    //    says the exit is unreachable may incorrectly infer that the
+    //    preconditions of the error states is false just because it
+    //    never propagates backwards from these special sink blocks.
+    basic_block_t &exit = m_cfg->get_node(m_cfg->exit());
+    for (auto &B : m_func) {
+      if (basic_block_t *b = lookup(B)) {
+        if (b->label() == m_cfg->exit())
+          continue;
 
-					auto it_pair = b->next_blocks();
-					if (it_pair.first == it_pair.second) {
-						// block has no successors and it is not the exit block
-						for (auto &I : B)
-							if (isa<UnreachableInst>(I))
-								*b >> exit;
-					}
-				}
-			}
-		}
-		else {
-			// We did not find an exit block yet:
+        auto it_pair = b->next_blocks();
+        if (it_pair.first == it_pair.second) {
+          // block has no successors and it is not the exit block
+          for (auto &I : B)
+            if (isa<UnreachableInst>(I))
+              *b >> exit;
+        }
+      }
+    }
+  } else {
+    // We did not find an exit block yet:
 
-			// (1) search for this pattern:
-			//   entry: goto loop;
-			//    loop: goto loop;
-			BasicBlock &entry = m_func.getEntryBlock();
-			auto entry_next = succs(entry);
-			if (std::distance(entry_next.begin(), entry_next.end()) == 1) {
-				const BasicBlock *succ = *(entry_next.begin());
-				auto succ_next = succs(*succ);
-				if (std::distance(succ_next.begin(), succ_next.end()) == 1) {
-					if ((*(succ_next.begin())) == succ) {
-						if (basic_block_t *exit = lookup(*succ)) {
-							m_cfg->set_exit(exit->label());
-						}
-					}
-				}
-			}
+    // (1) search for this pattern:
+    //   entry: goto loop;
+    //    loop: goto loop;
+    BasicBlock &entry = m_func.getEntryBlock();
+    auto entry_next = succs(entry);
+    if (std::distance(entry_next.begin(), entry_next.end()) == 1) {
+      const BasicBlock *succ = *(entry_next.begin());
+      auto succ_next = succs(*succ);
+      if (std::distance(succ_next.begin(), succ_next.end()) == 1) {
+        if ((*(succ_next.begin())) == succ) {
+          if (basic_block_t *exit = lookup(*succ)) {
+            m_cfg->set_exit(exit->label());
+          }
+        }
+      }
+    }
 
-			if (!m_cfg->has_exit()) {
-				// (2) We check if there is a block with an unreachable
-				// instruction. The pass UnifyFunctionExitNodes ensures that
-				// there is at most one unreachable instruction.
-				for (auto &B : m_func) {
-					for (auto &I : B) {
-						if (isa<UnreachableInst>(I)) {
-							if (basic_block_t *b = lookup(B)) {
-								m_cfg->set_exit(b->label());
-								break;
-							}
-						}
-					}
-					if (m_cfg->has_exit()) {
-						break;
-					}
-				}
-			}
+    if (!m_cfg->has_exit()) {
+      // (2) We check if there is a block with an unreachable
+      // instruction. The pass UnifyFunctionExitNodes ensures that
+      // there is at most one unreachable instruction.
+      for (auto &B : m_func) {
+        for (auto &I : B) {
+          if (isa<UnreachableInst>(I)) {
+            if (basic_block_t *b = lookup(B)) {
+              m_cfg->set_exit(b->label());
+              break;
+            }
+          }
+        }
+        if (m_cfg->has_exit()) {
+          break;
+        }
+      }
+    }
 
-			if (!m_cfg->has_exit()) {
-				// (3) Search for the first block without successors.
-				for (auto &B : m_func) {
-					if (basic_block_t *b = lookup(B)) {
-						auto it_pair = b->next_blocks();
-						if (it_pair.first == it_pair.second) {
-							m_cfg->set_exit(b->label());
-						}
-					}
-				}
-			}
-		}
+    if (!m_cfg->has_exit()) {
+      // (3) Search for the first block without successors.
+      for (auto &B : m_func) {
+        if (basic_block_t *b = lookup(B)) {
+          auto it_pair = b->next_blocks();
+          if (it_pair.first == it_pair.second) {
+            m_cfg->set_exit(b->label());
+          }
+        }
+      }
+    }
+  }
 
-		if (m_params.simplify) {
-			// Remove dead statements generated by our translation
-			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Started CFG dead code elimination\n";);
-			cfg_ref_t cfg_ref(*m_cfg);
-			crab::transforms::dead_code_elimination<cfg_ref_t> dce;
-			dce.run(cfg_ref);
-			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished CFG dead code elimination\n";);
+  if (m_params.simplify) {
+    // -- Remove dead statements generated by our translation
+    CRAB_VERBOSE_IF(1, crab::get_msg_stream()
+                           << "Started CFG dead code elimination\n";);
+    cfg_ref_t cfg_ref(*m_cfg);
+    crab::transforms::dead_code_elimination<cfg_ref_t> dce;
+    dce.run(cfg_ref);
+    CRAB_VERBOSE_IF(1, crab::get_msg_stream()
+                           << "Finished CFG dead code elimination\n";);
 
-			// Remove empty blocks after dce
-			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Started CFG simplification\n";);
-			m_cfg->simplify();
-			CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished CFG simplification\n";);
-		}
+    // -- Remove empty blocks after dce
+    CRAB_VERBOSE_IF(1, crab::get_msg_stream()
+                           << "Started CFG simplification\n";);
+    m_cfg->simplify();
+    CRAB_VERBOSE_IF(1, crab::get_msg_stream()
+                           << "Finished CFG simplification\n";);
+  }
 
-		if (m_params.print_cfg) {
-			crab::outs() << *m_cfg << "\n";
-		}
-	
-		return;
-	}
+  if (m_params.print_cfg) {
+    crab::outs() << *m_cfg << "\n";
+  }
+  return;
+}
+
 /* CrabBuilderParams class */
 
 void CrabBuilderParams::write(raw_ostream &o) const {
