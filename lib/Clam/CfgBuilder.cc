@@ -605,8 +605,12 @@ class CrabInstVisitor : public InstVisitor<CrabInstVisitor> {
   basic_block_t &m_bb;
   unsigned int m_object_id;
   bool m_has_seahorn_fail;
+  /**** 
+   * Here state that must survive to future invocations to
+   * CrabInstVisitor.
+   ****/
   // map gep to a crab variable
-  DenseMap<const GetElementPtrInst*, var_t> m_gep_map;
+  DenseMap<const GetElementPtrInst*, var_t> &m_gep_map;
   // reverse **partial** map from Crab statements to LLVM instructions
   DenseMap<const statement_t *, const Instruction *> &m_rev_map;
   // to initialize arrays
@@ -625,9 +629,11 @@ class CrabInstVisitor : public InstVisitor<CrabInstVisitor> {
   /* Evaluate the offset of an object pointed to by v statically */
   Optional<z_number> evalOffset(Value &v, LLVMContext &ctx);
   /* 
-     Try to figure out an arithmetic offset for load or store pointer operand.
+   * Try extra a Crab arithmetic offset from load or store pointer
+   * operand.
    */
-  lin_exp_t inferArrayIndex(Value *v, LLVMContext &ctx, llvm_variable_factory &vfac);
+  lin_exp_t inferArrayIndex(Value *v, LLVMContext &ctx, Region reg,
+			    llvm_variable_factory &vfac);
   
   unsigned getMaxBitWidthFromGepIndexes(GetElementPtrInst &I);
   /*
@@ -672,7 +678,9 @@ public:
       crabLitFactory &lfac, HeapAbstraction &mem, sea_dsa::ShadowMem *sm,
       const DataLayout *dl, const TargetLibraryInfo *tli, basic_block_t &bb,
       llvm::DenseMap<const statement_t *, const llvm::Instruction *> &rev_map,
-      std::set<Region> &init_regions, const CrabBuilderParams &params);
+      std::set<Region> &init_regions,
+      DenseMap<const GetElementPtrInst*, var_t> &gep_map,
+      const CrabBuilderParams &params);
 
   bool has_seahorn_fail() { return m_has_seahorn_fail; }
 
@@ -751,7 +759,7 @@ Optional<z_number> CrabInstVisitor::evalOffset(Value &v, LLVMContext &ctx) {
   return llvm::None;
 }
 
-lin_exp_t CrabInstVisitor::inferArrayIndex(Value *v, LLVMContext &ctx,
+lin_exp_t CrabInstVisitor::inferArrayIndex(Value *v, LLVMContext &ctx, Region reg,
 					   llvm_variable_factory &vfac) {
   auto offsetOpt = evalOffset(*v, ctx);
   if (offsetOpt.hasValue()) {
@@ -761,10 +769,10 @@ lin_exp_t CrabInstVisitor::inferArrayIndex(Value *v, LLVMContext &ctx,
     if (const GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(v)) {
       auto it = m_gep_map.find(GEPI);
       if (it == m_gep_map.end()) {
-	// TODO: Without sea-dsa shadow mem should not happen but
-	// otherwise it's possible because we don't currently extract
-	// regions from gep instructions.
-	CLAM_WARNING("could not find shadow gep variable for ", *GEPI);
+	if (!reg.isUnknown()) {
+	  // This is unexpected so we print a warning
+	  CLAM_WARNING("Could not find shadow gep variable for " << *GEPI);
+	}
 	return getUnconstrainedArrayIdxVar(vfac, 32);
       } else {
 	return it->second;
@@ -1157,8 +1165,11 @@ void CrabInstVisitor::doMemIntrinsic(MemIntrinsic &I) {
   if (MCI || MVI) {
     /** 
      * TODO: to be more precise we need from crab something like
-     * array_copy and prove that source and destination do not overlap
-     * if memmove instruction.
+     * array_copy that copies len bytes from dst to src. We could use
+     * array_assign if we know statically that src and dst have the
+     * same size and the memory transfer function copies the entire
+     * memory region. For memmove, we would also need to prove that
+     * source and destination do not overlap.
      **/
     if (MCI)      
       CLAM_WARNING("Skipped memcpy instruction");
@@ -1173,54 +1184,32 @@ void CrabInstVisitor::doMemIntrinsic(MemIntrinsic &I) {
       if (len_ref && val_ref && len_ref->isInt()) {
 	lin_exp_t lb_idx(number_t(0));
 	lin_exp_t ub_idx(m_lfac.getExp(len_ref) - 1);
+	// An aligment of x means that the address is multiple of x
+	// However, you can have an array of i32 and have aligment of 16.
+	//    @a = common global [5 x i32] zeroinitializer, align 16
 	uint64_t elem_size = MSI->getAlignment(); /*double check this*/
+
 	if (val_ref->isInt()) {
 	  if (val_ref->isVar()) {
-	    if (m_params.enabled_aggressive_array_initialization() &&
-		is_uninit_region) {
-	      crab_stmt = m_bb.array_init(arr_var, lb_idx, ub_idx, val_ref->getVar(),
-					  elem_size);
-	    } else {
-	      crab_stmt =
-		m_bb.array_store_range(arr_var, lb_idx, ub_idx, val_ref->getVar(),
-				       elem_size);
-            }
+	    crab_stmt =
+	      m_bb.array_store_range(arr_var, lb_idx, ub_idx, val_ref->getVar(),
+				     elem_size);
 	  } else {
-	    if (m_params.enabled_aggressive_array_initialization() &&
-		is_uninit_region) {
-	      crab_stmt = m_bb.array_init(arr_var, lb_idx, ub_idx,
-					  m_lfac.getIntCst(val_ref), elem_size);
-	    } else {
-	      crab_stmt =
-		m_bb.array_store_range(arr_var, lb_idx, ub_idx,
-				       m_lfac.getIntCst(val_ref), elem_size);
-	    }
+	    crab_stmt =
+	      m_bb.array_store_range(arr_var, lb_idx, ub_idx,
+				     m_lfac.getIntCst(val_ref), elem_size);
 	  }
 	} else if (val_ref->isBool()) {
 	  if (val_ref->isVar()) {
-	    if (m_params.enabled_aggressive_array_initialization() && 
-		is_uninit_region) {
-	      crab_stmt = m_bb.array_init(arr_var, lb_idx, ub_idx, val_ref->getVar(),
-					  elem_size);
-	    } else {
-	      crab_stmt =
-		m_bb.array_store_range(arr_var, lb_idx, ub_idx, val_ref->getVar(),
-				       elem_size);
-	    }
+	    crab_stmt =
+	      m_bb.array_store_range(arr_var, lb_idx, ub_idx, val_ref->getVar(),
+				     elem_size);
 	  } else {
-	    if (m_params.enabled_aggressive_array_initialization() &&
-		is_uninit_region) {	      
-	      crab_stmt = m_bb.array_init(arr_var, lb_idx, ub_idx,
-					  m_lfac.isBoolTrue(val_ref) ? number_t(1)
-					  : number_t(0),
-					  elem_size);
-	    } else {
-	      crab_stmt =
-		m_bb.array_store_range(arr_var, lb_idx, ub_idx,
-				       m_lfac.isBoolTrue(val_ref) ? number_t(1)
-				       : number_t(0),
-				       elem_size);
-	    }
+	    crab_stmt =
+	      m_bb.array_store_range(arr_var, lb_idx, ub_idx,
+				     m_lfac.isBoolTrue(val_ref) ? number_t(1)
+				     : number_t(0),
+				     elem_size);
 	  }
 	} else {
 	  /* unreachable */
@@ -1251,24 +1240,12 @@ void CrabInstVisitor::doGlobalInitializer(CallInst &I) {
   if (!callee) {
     return;
   }
-
-  if (!m_params.use_array_smashing && isIntInitializer(*callee)) {
-    // ignore the global initializer ...
-    return;
-  }
-  
+    
   // v is either a global variable or a gep instruction that
   // indexes an address inside the global variable.
   Value *v = CS.getArgument(0);
   Type *ty = cast<PointerType>(v->getType())->getElementType();
 
-  if (!m_params.use_array_smashing && isZeroInitializer(*callee)) {
-    if (!isIntArray(*ty) && !isBoolArray(*ty)) {
-      // ignore the global initializer ...      
-      return;
-    }
-  }
-  
   auto sm = getShadowMem();
   auto r = get_region(m_mem, sm, *m_dl, &I, v);
   auto getShadowVar = [&sm](CallInst &I, Value* v) {
@@ -1283,8 +1260,9 @@ void CrabInstVisitor::doGlobalInitializer(CallInst &I) {
       return Optional<Value*>();
     }
   };
-  
+
   if (!r.isUnknown()) {
+    
     crab_lit_ref_t ref = nullptr;
     if (CS.arg_size() == 2) {
       ref = m_lfac.getLit(*(CS.getArgument(1)));
@@ -1327,7 +1305,6 @@ void CrabInstVisitor::doGlobalInitializer(CallInst &I) {
 		     " cannot be inferred statically");
 	return; 
       } 
-
       
       number_t init_val(0);
       lin_exp_t lb_idx(offsetOpt.getValue());
@@ -1355,8 +1332,18 @@ void CrabInstVisitor::doGlobalInitializer(CallInst &I) {
 	IntegerType *int_ty = cast<IntegerType>(ty);
 	lin_exp_t ub_idx = lb_idx +
 	  number_t((isBool(ty) ? 0 : z_number((int_ty->getBitWidth() / 8) - 1)));
-	m_bb.array_init(a, lb_idx, ub_idx, init_val, elem_size);
-      } else if (isIntArray(*ty) || isBoolArray(*ty)) {
+	if (m_params.use_array_smashing) {
+	  m_bb.array_init(a, lb_idx, ub_idx, init_val, elem_size);
+	} else {
+	  m_bb.array_store_range(a, lb_idx, ub_idx, init_val, elem_size);
+	}
+      } else if (ty->isArrayTy()) {
+
+	// We don't limit ourselves to isIntArray(*ty) or
+	// isBoolArray(*ty) since we can have array of structs with
+	// only one integer or boolean field which are equivalent
+	// memory-wise.
+	
         if (cast<ArrayType>(ty)->getNumElements() == 0) {
           // zero-length array are possible inside structs We
           // can simply make ub_idx > 0.  However, DSA is very
@@ -1368,7 +1355,11 @@ void CrabInstVisitor::doGlobalInitializer(CallInst &I) {
 	  elem_size = storageSize(cast<ArrayType>(ty)->getElementType());
 	  lin_exp_t ub_idx = lb_idx + lin_exp_t(
 			     cast<ArrayType>(ty)->getNumElements() * elem_size - 1);
-	  m_bb.array_init(a, lb_idx, ub_idx, init_val, elem_size);
+	  if (m_params.use_array_smashing) {	  
+	    m_bb.array_init(a, lb_idx, ub_idx, init_val, elem_size);
+	  } else {
+	    m_bb.array_store_range(a, lb_idx, ub_idx, init_val, elem_size);	    
+	  }
         }
       } else { /** unreachable **/
       }
@@ -1496,9 +1487,11 @@ CrabInstVisitor::CrabInstVisitor(
     crabLitFactory &lfac, HeapAbstraction &mem, sea_dsa::ShadowMem *sm,
     const DataLayout *dl, const TargetLibraryInfo *tli, basic_block_t &bb,
     llvm::DenseMap<const statement_t *, const llvm::Instruction *> &rev_map,
-    std::set<Region> &init_regions, const CrabBuilderParams &params)
+    std::set<Region> &init_regions,
+    DenseMap<const GetElementPtrInst*, var_t> &gep_map,
+    const CrabBuilderParams &params)
   : m_lfac(lfac), m_mem(mem), m_sm(sm), m_dl(dl), m_tli(tli), m_bb(bb), m_object_id(0),
-    m_has_seahorn_fail(false), m_rev_map(rev_map),
+    m_has_seahorn_fail(false), m_gep_map(gep_map), m_rev_map(rev_map),
     m_init_regions(init_regions), m_params(params) {}
 
 /// I is already translated if it is the condition of a branch or
@@ -2015,42 +2008,56 @@ void CrabInstVisitor::visitGetElementPtrInst(GetElementPtrInst &I) {
     doGep(I, bitwidth, lhs->getVar(), ptr->getVar());
     
   } else if (m_params.precision_level == crab::cfg::ARR) {
-    Region r = get_region(m_mem, getShadowMem(), *m_dl, &I, &I);
+    /*
+      The goal is to compute an array index expression to be used by
+      some array read or write. It's not always possible to figure out
+      the array index expression because we need to know the base
+      address. We try the following:
 
-    if (r.isUnknown()) {
-      // we don't keep track of the memory region, we bail out ...
-      return;
-    }
-    if (get_singleton_value(r, m_params.lower_singleton_aliases)) {
-      // the memory region is a singleton, we bail out ...
-      return;
-    }
+      1. Ask LLVM MemoryBuiltins::ObjectSizeOffsetVisitor. LLVM will
+      succeed if the GEP is a constant value and the memory objects is
+      a global or alloca.
 
+      2. Ask sea-dsa the memory region associated to the GEP pointer
+      operand Ptr and see if Ptr points to a cell with zero offset and
+      the node is not collapsed and not a sequence either. If we
+      succeed then we can translate the pointer arithmetic part the of
+      GEP instruction (this is done by doGep).
+     */
+    
     if (evalOffset(I, I.getContext()).hasValue()) {
       // we can skip the GEP instruction because the offset is a known
-      // constant
+      // constant. The next Load or Store will call evalOffset again
+      // to obtain the constant index.
       return;
     }
 
+    Value *Ptr = I.getPointerOperand();
+    Ptr = Ptr->stripPointerCasts();
+    bool isBasePtr = isa<AllocaInst>(Ptr) || isa<GlobalVariable>(Ptr);
     
-    Value *V = I.getPointerOperand();
-    V = V->stripPointerCasts();
-    
-    bool isBasePtr = isa<AllocaInst>(V) || isa<GlobalVariable>(V);
     if (!isBasePtr) {
       if (auto sm = getShadowMem()) {
 	CLAM_WARNING("TODO: precise translation of GEP if shadow mem is used");
       } else {
+	Region r = get_region(m_mem, getShadowMem(), *m_dl, &I, &I);
+	if (r.isUnknown()) {
+	  // we don't keep track of the memory region, we bail out ...
+	  return;
+	}
+	if (get_singleton_value(r, m_params.lower_singleton_aliases)) {
+	  // the memory region is a singleton, we bail out ...
+	  return;
+	}
 	// We ask the pointer analysis. That should allow us to
 	// translate also inside functions where the parameter is the
 	// address of a caller's alloca. 
-	isBasePtr =
-	  m_mem.isBasePtr(*(I.getParent()->getParent()), I.getPointerOperand());
+	isBasePtr = m_mem.isBasePtr(*(I.getParent()->getParent()), Ptr);
       }
     }
-
+    
+    
     assert(m_gep_map.find(&I) == m_gep_map.end());
-        
     if (isBasePtr) {
       var_t shadowV(m_lfac.get_vfac().get(), crab::INT_TYPE, bitwidth);
       m_gep_map.insert(std::make_pair(&I, shadowV));
@@ -2058,7 +2065,7 @@ void CrabInstVisitor::visitGetElementPtrInst(GetElementPtrInst &I) {
     } else {
       var_t shadowV = getUnconstrainedArrayIdxVar(m_lfac.get_vfac(), bitwidth);      
       CRAB_LOG("cfg-array-index",
-	       CLAM_WARNING("cannot infer statically base address of  " << *V
+	       CLAM_WARNING("cannot infer statically base address of  " << *Ptr
 			    << " at function " << I.getParent()->getParent()->getName()
 			    << ".\nUsing unconstrained crab variable " << shadowV.name().str()););
       m_gep_map.insert(std::make_pair(&I, shadowV));
@@ -2089,8 +2096,8 @@ void CrabInstVisitor::doStoreInst(StoreInst &I, bool is_singleton,
     } else { /* unreachable */ }
   } else {
     lin_exp_t idx = inferArrayIndex(I.getPointerOperand(),
-				      I.getContext(),
-				      m_lfac.get_vfac());
+				    I.getContext(),
+				    reg, m_lfac.get_vfac());
     /**
      * We can help the array domain if we know already that
      * the array store is a strong update.
@@ -2265,7 +2272,7 @@ void CrabInstVisitor::doLoadInst(LoadInst &I, bool is_singleton,
     }
     
     lin_exp_t idx = inferArrayIndex(I.getPointerOperand(),
-				    I.getContext(),
+				    I.getContext(), reg,
 				    m_lfac.get_vfac());
     
     auto const *crab_stmt = m_bb.array_load(
@@ -2356,14 +2363,13 @@ void CrabInstVisitor::visitAllocaInst(AllocaInst &I) {
     crab_lit_ref_t lhs = m_lfac.getLit(I);
     assert(lhs && lhs->isVar());
     m_bb.ptr_new_object(lhs->getVar(), m_object_id++);
-  } else if (m_lfac.get_track() == ARR &&
-	     m_params.enabled_array_initialization()) {
+  } else if (m_lfac.get_track() == ARR && m_params.use_array_smashing) { 
     Region r = get_region(m_mem, getShadowMem(), *m_dl, &I, &I);
     if (!r.isUnknown()) {
       // Nodes which do not have an explicit initialization are
       // initially undefined. Instead, we assume they are zero
-      // initialized so that Crab's array smashing can infer
-      // something meaningful.
+      // initialized so that Crab's array smashing can infer something
+      // meaningful.
       Type *elementTy = nullptr;
       unsigned numElems = 0;
       if (SequentialType *ST = dyn_cast<SequentialType>(I.getAllocatedType())) {
@@ -2388,8 +2394,7 @@ void CrabInstVisitor::visitAllocaInst(AllocaInst &I) {
 	    number_t init_val(0);
 	    number_t lb_idx(0);
 	    number_t ub_idx((numElems * elemSize) - 1);
-	  m_bb.array_init(m_lfac.mkArrayVar(r), lb_idx, ub_idx, init_val,
-			  elemSize);
+	    m_bb.array_init(m_lfac.mkArrayVar(r), lb_idx, ub_idx, init_val, elemSize);
 	  }
 	}
       }
@@ -2444,7 +2449,7 @@ void CrabInstVisitor::visitCallInst(CallInst &I) {
 		return;
 	}
 
-  	if(isClamVarTagsFn(*callee)){
+  if(isClamVarTagsFn(*callee)){
 		std::vector<var_t> inputs;
 
 		// -- add the actual parameters of the llvm callsite: i1,...in.
@@ -2458,8 +2463,7 @@ void CrabInstVisitor::visitCallInst(CallInst &I) {
 		return;
 	}
 
-  if (m_params.enabled_array_initialization() &&
-      (isZeroInitializer(*callee) || isIntInitializer(*callee))) {
+  if (isZeroInitializer(*callee) || isIntInitializer(*callee)) {
     doGlobalInitializer(I);
     return;
   }
@@ -2498,6 +2502,8 @@ void CrabInstVisitor::visitCallInst(CallInst &I) {
       havoc(lhs->getVar(), m_bb, m_params.include_useless_havoc);
     }
     // -- havoc all modified regions by the callee
+    // Note that even if the code is not available for the callee, the
+    // pointer analysis might be able to model its pointer semantics.
     if (m_lfac.get_track() == ARR) {
       RegionVec mods = get_modified_regions(m_mem, I);
       for (auto a : mods) {
@@ -2508,6 +2514,10 @@ void CrabInstVisitor::visitCallInst(CallInst &I) {
       }
     }
 
+    CLAM_WARNING("Call to external function " << callee->getName() << ". "  
+		 << "Havocing the return value and possibly its modified memory regions "
+		 << "if the pointer analysis models the external function");
+    
     // XXX: if we return here we skip the callsite. This is fine
     //      unless there exists an analysis which cares about
     //      external calls.
@@ -2662,351 +2672,358 @@ void CrabInstVisitor::visitInstruction(Instruction &I) {
 
 namespace clam {
 
-	class CfgBuilderImpl {
-		public:
-			CfgBuilderImpl(const llvm::Function &func, llvm_variable_factory &vfac, HeapAbstraction &mem,
-			sea_dsa::ShadowMem *sm, const llvm::TargetLibraryInfo *tli, const CrabBuilderParams &params);
+class CfgBuilderImpl {
+public:
+  CfgBuilderImpl(const llvm::Function &func, llvm_variable_factory &vfac,
+                 HeapAbstraction &mem, sea_dsa::ShadowMem *sm,
+		 const llvm::TargetLibraryInfo *tli,
+		 const CrabBuilderParams &params);
 
-			void build_cfg();
+  void build_cfg();
 
-			CfgBuilderImpl(const CfgBuilderImpl &o) = delete;
+  CfgBuilderImpl(const CfgBuilderImpl &o) = delete;
 
-			CfgBuilderImpl &operator=(const CfgBuilderImpl &o) = delete;
+  CfgBuilderImpl &operator=(const CfgBuilderImpl &o) = delete;
 
-			~CfgBuilderImpl();
+  ~CfgBuilderImpl();
 
-			// return crab control flow graph
-			cfg_t &get_cfg();
+  // return crab control flow graph
+  cfg_t &get_cfg();
 
-			// map a llvm basic block to a crab basic block label
-			basic_block_label_t get_crab_basic_block(const llvm::BasicBlock *bb) const;
+  // map a llvm basic block to a crab basic block label
+  basic_block_label_t get_crab_basic_block(const llvm::BasicBlock *bb) const;
 
-			// map a llvm edge to a crab basic block label.
-			// return nullptr if the edge is not translated to a crab basic block.
-			const basic_block_label_t *
-			get_crab_basic_block(const llvm::BasicBlock *src, const llvm::BasicBlock *dst) const;
+  // map a llvm edge to a crab basic block label.
+  // return nullptr if the edge is not translated to a crab basic block.
+  const basic_block_label_t *
+  get_crab_basic_block(const llvm::BasicBlock *src,
+                       const llvm::BasicBlock *dst) const;
 
-			// Most crab statements have back pointers to LLVM operands so it
-			// is always possible to find the corresponding LLVM
-			// instruction. Array crab operations are an exception.
-			//
-			// This method maps an **array** crab statement to its
-			// corresponding llvm instruction. Return null if the the array
-			// instruction is not mapped to a LLVM instruction.
-			const llvm::Instruction *get_instruction(const statement_t &s) const;
+  // Most crab statements have back pointers to LLVM operands so it
+  // is always possible to find the corresponding LLVM
+  // instruction. Array crab operations are an exception.
+  //
+  // This method maps an **array** crab statement to its
+  // corresponding llvm instruction. Return null if the the array
+  // instruction is not mapped to a LLVM instruction.
+  const llvm::Instruction *get_instruction(const statement_t &s) const;
 
-		private:
-			// map from a llvm basic block to a crab basic block id
-			using node_to_crab_block_map_t = std::unordered_map<const llvm::BasicBlock *, basic_block_label_t>;
+private:
+  // map from a llvm basic block to a crab basic block id
+  using node_to_crab_block_map_t =
+      std::unordered_map<const llvm::BasicBlock *, basic_block_label_t>;
 
-			struct pair_hash {
-				template <typename T1, typename T2>
-				std::size_t operator()(const std::pair<T1, T2> &p) const {
-				std::size_t seed = 0;
-				boost::hash_combine(seed, p.first);
-				boost::hash_combine(seed, p.second);
-				return seed;
-				}
-			};
+  struct pair_hash {
+    template <typename T1, typename T2>
+    std::size_t operator()(const std::pair<T1, T2> &p) const {
+      std::size_t seed = 0;
+      boost::hash_combine(seed, p.first);
+      boost::hash_combine(seed, p.second);
+      return seed;
+    }
+  };
 
-			// map from a llvm edge to a crab basic block id
-			using edge_to_crab_block_map_t = std::unordered_map<
-				std::pair<const llvm::BasicBlock *, const llvm::BasicBlock *>,
-				basic_block_label_t, pair_hash>;
+  // map from a llvm edge to a crab basic block id
+  using edge_to_crab_block_map_t = std::unordered_map<
+      std::pair<const llvm::BasicBlock *, const llvm::BasicBlock *>,
+      basic_block_label_t, pair_hash>;
 
-			// keep track whether the crab CFG has been built
-			bool m_is_cfg_built;
-			// The function should be const because it's never modified.
-			llvm::Function &m_func;
-			// literal factory
-			crabLitFactory m_lfac;
-			// heap analysis for array translation
-			HeapAbstraction &m_mem;
-			// shadow mem for memory ssa form
-			sea_dsa::ShadowMem *m_sm;
-			// the crab CFG
-			std::unique_ptr<cfg_t> m_cfg;
-			// generate unique identifiers for crab basic block ids
-			unsigned int m_id;
-			// map llvm CFG basic blocks to crab basic block ids
-			node_to_crab_block_map_t m_node_to_crab_map;
-			// map llvm CFG edges to crab basic block ids
-			edge_to_crab_block_map_t m_edge_to_crab_map;
-			// map Crab statement to its corresponding LLVM instruction
-			//
-			// In most of the crab statements, their operands have back
-			// pointers to their corresponding LLVM values. However, this is
-			// not the case for array instructions. For those case, we keep
-			// explicitly the reverse mapping.
-			llvm::DenseMap<const statement_t *, const llvm::Instruction *> m_rev_map;
-			// information about LLVM pointers
-			const llvm::DataLayout *m_dl;
-			const llvm::TargetLibraryInfo *m_tli;
-			// cfg builder parameters
-			const CrabBuilderParams &m_params;
+  // keep track whether the crab CFG has been built
+  bool m_is_cfg_built;
+  // The function should be const because it's never modified.
+  llvm::Function &m_func;
+  // literal factory
+  crabLitFactory m_lfac;
+  // heap analysis for array translation
+  HeapAbstraction &m_mem;
+  // shadow mem for memory ssa form
+  sea_dsa::ShadowMem *m_sm;
+  // the crab CFG
+  std::unique_ptr<cfg_t> m_cfg;
+  // generate unique identifiers for crab basic block ids
+  unsigned int m_id;
+  // map llvm CFG basic blocks to crab basic block ids
+  node_to_crab_block_map_t m_node_to_crab_map;
+  // map llvm CFG edges to crab basic block ids
+  edge_to_crab_block_map_t m_edge_to_crab_map;
+  // map Crab statement to its corresponding LLVM instruction
+  //
+  // In most of the crab statements, their operands have back
+  // pointers to their corresponding LLVM values. However, this is
+  // not the case for array instructions. For those case, we keep
+  // explicitly the reverse mapping.
+  llvm::DenseMap<const statement_t *, const llvm::Instruction *> m_rev_map;
+  // information about LLVM pointers
+  const llvm::DataLayout *m_dl;
+  const llvm::TargetLibraryInfo *m_tli;
+  // cfg builder parameters
+  const CrabBuilderParams &m_params;
 
-			/// Helpers for build_cfg
+  /// Helpers for build_cfg
 
-			// Given a llvm basic block return its corresponding crab basic block
-			basic_block_t *lookup(const llvm::BasicBlock &bb) const;
+  // Given a llvm basic block return its corresponding crab basic block
+  basic_block_t *lookup(const llvm::BasicBlock &bb) const;
 
-			void add_block(const llvm::BasicBlock &bb);
+  void add_block(const llvm::BasicBlock &bb);
 
-			void add_edge(const llvm::BasicBlock &src, const llvm::BasicBlock &target);
+  void add_edge(const llvm::BasicBlock &src, const llvm::BasicBlock &target);
 
-			basic_block_t *exec_edge(const llvm::BasicBlock &src, const llvm::BasicBlock &target);
+  basic_block_t *exec_edge(const llvm::BasicBlock &src,
+                           const llvm::BasicBlock &target);
 
-			void add_block_in_between(basic_block_t &src, basic_block_t &dst, basic_block_t &between);
+  void add_block_in_between(basic_block_t &src, basic_block_t &dst,
+                            basic_block_t &between);
 
-			basic_block_label_t make_crab_basic_block_label(const llvm::BasicBlock *bb);
+  basic_block_label_t make_crab_basic_block_label(const llvm::BasicBlock *bb);
 
-			basic_block_label_t make_crab_basic_block_label(const llvm::BasicBlock *src,
-															const llvm::BasicBlock *dst);
-	}; // end class CfgBuilderImpl
+  basic_block_label_t make_crab_basic_block_label(const llvm::BasicBlock *src,
+                                                  const llvm::BasicBlock *dst);
+}; // end class CfgBuilderImpl
 
-	CfgBuilderImpl::CfgBuilderImpl(
-		const Function &func,
-		llvm_variable_factory &vfac,
-		HeapAbstraction &mem, sea_dsa::ShadowMem *sm,
-		const TargetLibraryInfo *tli,
-		const CrabBuilderParams &params)
-			: m_is_cfg_built(false),
-				// HACK: it's safe to remove constness because we know that the Builder never modifies the bitcode.
-			  m_func(const_cast<Function &>(func)), m_lfac(vfac, params),
-			  m_mem(mem), m_sm(sm),
-			  m_cfg(nullptr), m_id(0), m_dl(&(func.getParent()->getDataLayout())),
-			  m_tli(tli), m_params(params) {
-				m_cfg.reset(new cfg_t(make_crab_basic_block_label(&m_func.getEntryBlock()), m_params.precision_level));
-			}
+CfgBuilderImpl::CfgBuilderImpl(const Function &func,
+                               llvm_variable_factory &vfac,
+                               HeapAbstraction &mem, sea_dsa::ShadowMem *sm,
+                               const TargetLibraryInfo *tli,
+                               const CrabBuilderParams &params)
+    : m_is_cfg_built(false),
+      // HACK: it's safe to remove constness because we know that the
+      // Builder never modifies the bitcode.
+      m_func(const_cast<Function &>(func)), m_lfac(vfac, params),
+      m_mem(mem), m_sm(sm),
+      m_cfg(nullptr), m_id(0), m_dl(&(func.getParent()->getDataLayout())),
+      m_tli(tli), m_params(params) {
+  m_cfg.reset(new cfg_t(make_crab_basic_block_label(&m_func.getEntryBlock()),
+                        m_params.precision_level));
+}
 
-	CfgBuilderImpl::~CfgBuilderImpl() {}
+CfgBuilderImpl::~CfgBuilderImpl() {}
 
-	cfg_t &CfgBuilderImpl::get_cfg() {
-		// it won't build if already built
-		build_cfg();
-		return *m_cfg;
-	}
+cfg_t &CfgBuilderImpl::get_cfg() {
+  // it won't build if already built
+  build_cfg();
+  return *m_cfg;
+}
 
-	const llvm::Instruction*
-	CfgBuilderImpl::get_instruction(const statement_t &s) const {
-		auto it = m_rev_map.find(&s);
-		if (it != m_rev_map.end()) {
-			return it->second;
-		}
-		else {
-			return nullptr;
-		}
-	}
+const llvm::Instruction *
+CfgBuilderImpl::get_instruction(const statement_t &s) const {
+  auto it = m_rev_map.find(&s);
+  if (it != m_rev_map.end()) {
+    return it->second;
+  } else {
+    return nullptr;
+  }
+}
 
-	basic_block_label_t
-	CfgBuilderImpl::get_crab_basic_block(const BasicBlock *bb) const {
-		auto it = m_node_to_crab_map.find(bb);
-		if (it == m_node_to_crab_map.end()) {
-			CLAM_ERROR("cannot map llvm basic block ", bb->getName(), " to crab basic block label");
-		}
-		return it->second;
-	}
+basic_block_label_t
+CfgBuilderImpl::get_crab_basic_block(const BasicBlock *bb) const {
+  auto it = m_node_to_crab_map.find(bb);
+  if (it == m_node_to_crab_map.end()) {
+    CLAM_ERROR("cannot map llvm basic block ", bb->getName(),
+               " to crab basic block label");
+  }
+  return it->second;
+}
 
-	const basic_block_label_t*
-	CfgBuilderImpl::get_crab_basic_block(const BasicBlock *src, const BasicBlock *dst) const {
-		auto it = m_edge_to_crab_map.find(std::make_pair(src, dst));
-		if (it != m_edge_to_crab_map.end()) {
-			return &(it->second);
-		}
-		else {
-			return nullptr;
-		}
-	}
+const basic_block_label_t *
+CfgBuilderImpl::get_crab_basic_block(const BasicBlock *src,
+                                     const BasicBlock *dst) const {
+  auto it = m_edge_to_crab_map.find(std::make_pair(src, dst));
+  if (it != m_edge_to_crab_map.end()) {
+    return &(it->second);
+  } else {
+    return nullptr;
+  }
+}
 
-	// Given a llvm basic block return its corresponding crab basic block
-	basic_block_t *CfgBuilderImpl::lookup(const BasicBlock &bb) const {
-		auto it = m_node_to_crab_map.find(&bb);
-		if (it == m_node_to_crab_map.end()) {
-			return nullptr;
-		}
-		return &(m_cfg->get_node(it->second));
-	}
+// Given a llvm basic block return its corresponding crab basic block
+basic_block_t *CfgBuilderImpl::lookup(const BasicBlock &bb) const {
+  auto it = m_node_to_crab_map.find(&bb);
+  if (it == m_node_to_crab_map.end()) {
+    return nullptr;
+  }
+  return &(m_cfg->get_node(it->second));
+}
 
-	void CfgBuilderImpl::add_block(const BasicBlock &bb) {
-		auto it = m_node_to_crab_map.find(&bb);
-		if (it == m_node_to_crab_map.end()) {
-			auto bb_label = make_crab_basic_block_label(&bb);
-			m_cfg->insert(bb_label);
-		}
-	}
+void CfgBuilderImpl::add_block(const BasicBlock &bb) {
+  auto it = m_node_to_crab_map.find(&bb);
+  if (it == m_node_to_crab_map.end()) {
+    auto bb_label = make_crab_basic_block_label(&bb);
+    m_cfg->insert(bb_label);
+  }
+}
 
-	void CfgBuilderImpl::add_edge(const BasicBlock &src, const BasicBlock &dst) {
-	basic_block_t *crab_src = lookup(src);
-	basic_block_t *crab_dst = lookup(dst);
-	assert(crab_src && crab_dst);
-	*crab_src >> *crab_dst;
-	}
+void CfgBuilderImpl::add_edge(const BasicBlock &src, const BasicBlock &dst) {
+  basic_block_t *crab_src = lookup(src);
+  basic_block_t *crab_dst = lookup(dst);
+  assert(crab_src && crab_dst);
+  *crab_src >> *crab_dst;
+}
 
-	void CfgBuilderImpl::add_block_in_between(basic_block_t &src,
-											basic_block_t &dst,
-											basic_block_t &bb) {
-	src -= dst;
-	src >> bb;
-	bb >> dst;
-	}
+void CfgBuilderImpl::add_block_in_between(basic_block_t &src,
+                                          basic_block_t &dst,
+                                          basic_block_t &bb) {
+  src -= dst;
+  src >> bb;
+  bb >> dst;
+}
 
-	basic_block_label_t
-	CfgBuilderImpl::make_crab_basic_block_label(const BasicBlock *bb) {
-		++m_id;
-		basic_block_label_t res(bb, m_id);
-		m_node_to_crab_map.insert({bb, res});
-		return res;
-	}
+basic_block_label_t
+CfgBuilderImpl::make_crab_basic_block_label(const BasicBlock *bb) {
+  ++m_id;
+  basic_block_label_t res(bb, m_id);
+  m_node_to_crab_map.insert({bb, res});
+  return res;
+}
 
-	static std::string create_bb_name(unsigned id, std::string prefix = "") {
-	if (prefix == "")
-		prefix = std::string("__@bb_");
-	std::string id_str = std::to_string(id);
-	return prefix + id_str;
-	}
+static std::string create_bb_name(unsigned id, std::string prefix = "") {
+  if (prefix == "")
+    prefix = std::string("__@bb_");
+  std::string id_str = std::to_string(id);
+  return prefix + id_str;
+}
 
-	basic_block_label_t
-	CfgBuilderImpl::make_crab_basic_block_label(const BasicBlock *src,
-												const BasicBlock *dst) {
-	++m_id;
-	std::string name = create_bb_name(m_id);
-	basic_block_label_t res(src, dst, name, m_id);
-	m_edge_to_crab_map.insert({{src, dst}, res});
-	return res;
-	}
+basic_block_label_t
+CfgBuilderImpl::make_crab_basic_block_label(const BasicBlock *src,
+                                            const BasicBlock *dst) {
+  ++m_id;
+  std::string name = create_bb_name(m_id);
+  basic_block_label_t res(src, dst, name, m_id);
+  m_edge_to_crab_map.insert({{src, dst}, res});
+  return res;
+}
 
-	//! return the new block inserted between src and dest if any
-	basic_block_t *CfgBuilderImpl::exec_edge(const BasicBlock &src,
-											const BasicBlock &dst) {
-	if (const BranchInst *br = dyn_cast<const BranchInst>(src.getTerminator())) {
-		if (br->isConditional()) {
-		basic_block_t *crab_src = lookup(src);
-		basic_block_t *crab_dst = lookup(dst);
-		assert(crab_src && crab_dst);
+//! return the new block inserted between src and dest if any
+basic_block_t *CfgBuilderImpl::exec_edge(const BasicBlock &src,
+                                         const BasicBlock &dst) {
+  if (const BranchInst *br = dyn_cast<const BranchInst>(src.getTerminator())) {
+    if (br->isConditional()) {
+      basic_block_t *crab_src = lookup(src);
+      basic_block_t *crab_dst = lookup(dst);
+      assert(crab_src && crab_dst);
 
-		// Create a new crab block that represents the LLVM edge
-		auto bb_label = make_crab_basic_block_label(&src, &dst);
-		basic_block_t &bb = m_cfg->insert(bb_label);
-		add_block_in_between(*crab_src, *crab_dst, bb);
+      // Create a new crab block that represents the LLVM edge
+      auto bb_label = make_crab_basic_block_label(&src, &dst);
+      basic_block_t &bb = m_cfg->insert(bb_label);
+      add_block_in_between(*crab_src, *crab_dst, bb);
 
-		// Populate the new crab block with an assume
-		const Value &c = *br->getCondition();
-		if (const ConstantInt *ci = dyn_cast<const ConstantInt>(&c)) {
-			if ((ci->isOne() && br->getSuccessor(0) != &dst) ||
-				(ci->isZero() && br->getSuccessor(1) != &dst)) {
-			bb.unreachable();
-			}
-		} else if (const ConstantExpr *ce = dyn_cast<const ConstantExpr>(&c)) {
-			CLAM_WARNING("Clam cfg builder skipped a branch condition with "
-						"constant expression");
-		} else {
-			bool isNegated = (br->getSuccessor(1) == &dst);
-			bool lower_cond_as_bool = false;
-			if (CmpInst *CI = dyn_cast<CmpInst>(&const_cast<Value &>(c))) {
-			if (isBool(*(CI->getOperand(0))) && isBool(*(CI->getOperand(1)))) {
-				lower_cond_as_bool = true;
-			} else if (isInteger(*(CI->getOperand(0))) &&
-						isInteger(*(CI->getOperand(1)))) {
-				auto cst_opt = cmpInstToCrabInt(*CI, m_lfac, isNegated);
-				if (cst_opt.hasValue()) {
-				bb.assume(cst_opt.getValue());
-				}
-			} else if (isPointer(*(CI->getOperand(0)), m_params) &&
-						isPointer(*(CI->getOperand(1)), m_params)) {
-				auto cst_opt = cmpInstToCrabPtr(*CI, m_lfac, isNegated);
-				if (cst_opt.hasValue()) {
-				bb.ptr_assume(cst_opt.getValue());
-				}
-			}
-			if (c.hasNUsesOrMore(2)) {
-				// If I is used by another instruction apart from a
-				// branch condition.
-				lower_cond_as_bool = true;
-			}
-			} else {
-			// If the boolean condition is passed directly (e.g.,
-			// after optimization) as a function argument.
-			lower_cond_as_bool = true;
-			}
+      // Populate the new crab block with an assume
+      const Value &c = *br->getCondition();
+      if (const ConstantInt *ci = dyn_cast<const ConstantInt>(&c)) {
+        if ((ci->isOne() && br->getSuccessor(0) != &dst) ||
+            (ci->isZero() && br->getSuccessor(1) != &dst)) {
+          bb.unreachable();
+        }
+      } else if (const ConstantExpr *ce = dyn_cast<const ConstantExpr>(&c)) {
+        CLAM_WARNING("Clam cfg builder skipped a branch condition with "
+                     "constant expression");
+      } else {
+        bool isNegated = (br->getSuccessor(1) == &dst);
+        bool lower_cond_as_bool = false;
+        if (CmpInst *CI = dyn_cast<CmpInst>(&const_cast<Value &>(c))) {
+          if (isBool(*(CI->getOperand(0))) && isBool(*(CI->getOperand(1)))) {
+            lower_cond_as_bool = true;
+          } else if (isInteger(*(CI->getOperand(0))) &&
+                     isInteger(*(CI->getOperand(1)))) {
+            auto cst_opt = cmpInstToCrabInt(*CI, m_lfac, isNegated);
+            if (cst_opt.hasValue()) {
+              bb.assume(cst_opt.getValue());
+            }
+          } else if (isPointer(*(CI->getOperand(0)), m_params) &&
+                     isPointer(*(CI->getOperand(1)), m_params)) {
+            auto cst_opt = cmpInstToCrabPtr(*CI, m_lfac, isNegated);
+            if (cst_opt.hasValue()) {
+              bb.ptr_assume(cst_opt.getValue());
+            }
+          }
+          if (c.hasNUsesOrMore(2)) {
+            // If I is used by another instruction apart from a
+            // branch condition.
+            lower_cond_as_bool = true;
+          }
+        } else {
+          // If the boolean condition is passed directly (e.g.,
+          // after optimization) as a function argument.
+          lower_cond_as_bool = true;
+        }
 
-			if (lower_cond_as_bool) {
-			crab_lit_ref_t lhs = m_lfac.getLit(c);
-			assert(lhs && lhs->isVar());
-			assert(lhs->isBool());
-			if (isNegated)
-				bb.bool_not_assume(lhs->getVar());
-			else
-				bb.bool_assume(lhs->getVar());
-			}
-		}
-		return &bb;
-		} else {
-		// br is unconditional
-		add_edge(src, dst);
-		}
-	} else if (const SwitchInst *SI = dyn_cast<SwitchInst>(src.getTerminator())) {
-		// switch <value>, label <defaultdest> [ <val>, label <dest> ... ]
-		//
-		// TODO: we do not translate precisely switch instructions. We
-		// simply add an edge from src to dest.
+        if (lower_cond_as_bool) {
+          crab_lit_ref_t lhs = m_lfac.getLit(c);
+          assert(lhs && lhs->isVar());
+          assert(lhs->isBool());
+          if (isNegated)
+            bb.bool_not_assume(lhs->getVar());
+          else
+            bb.bool_assume(lhs->getVar());
+        }
+      }
+      return &bb;
+    } else {
+      // br is unconditional
+      add_edge(src, dst);
+    }
+  } else if (const SwitchInst *SI = dyn_cast<SwitchInst>(src.getTerminator())) {
+    // switch <value>, label <defaultdest> [ <val>, label <dest> ... ]
+    //
+    // TODO: we do not translate precisely switch instructions. We
+    // simply add an edge from src to dest.
 
-		// To be precise, we need to create a block between src and dest
-		// and add the statement "assume(value == val)" if dest is not
-		// the default block. For the default block, we need to add the
-		// sequence:
-		//      "assume(value != val1); ... ; assume(value != valk);"
+    // To be precise, we need to create a block between src and dest
+    // and add the statement "assume(value == val)" if dest is not
+    // the default block. For the default block, we need to add the
+    // sequence:
+    //      "assume(value != val1); ... ; assume(value != valk);"
 
-		add_edge(src, dst);
-	}
-	return nullptr;
-	}
+    add_edge(src, dst);
+  }
+  return nullptr;
+}
 
-	void CfgBuilderImpl::build_cfg() {
+void CfgBuilderImpl::build_cfg() {
+  if (m_is_cfg_built) {
+    return;
+  }
+  m_is_cfg_built = true;
+  crab::ScopedCrabStats __st__("CFG Construction");
 
-		if (m_is_cfg_built) {
-			return;
-		}
+  // Sanity check: pass NameValues must have been executed before
+  bool res = checkAllDefinitionsHaveNames(m_func);
+  if (!res) {
+    CLAM_ERROR("All blocks and definitions must have a name");
+  }
 
-		m_is_cfg_built = true;
-		crab::ScopedCrabStats __st__("CFG Construction");
+  // Create create basic block for each LLVM block
+  for (auto &B : m_func) {
+    add_block(B);
+  }
 
-		// Sanity check: pass NameValues must have been executed before
-		bool res = checkAllDefinitionsHaveNames(m_func);
-		if (!res) {
-			CLAM_ERROR("All blocks and definitions must have a name");
-		}
+  basic_block_t *ret_block = nullptr;
+  var_ref_t ret_val;
+  bool has_seahorn_fail = false;
+  // keep track of initialized regions
+  std::set<Region> init_regions;
+  // For translation of gep if precision level is ARR
+  DenseMap<const GetElementPtrInst*, var_t> gep_map;
+  
+  for (auto &B : m_func) {
+    basic_block_t *bb = lookup(B);
+    if (!bb)
+      continue;
 
-		// Create basic block for each LLVM block
-		for (auto &B : m_func) {
-			add_block(B);
-		}
+    // -- build a CFG block ignoring branches, phi-nodes, and return
+    CrabInstVisitor v(m_lfac, m_mem, m_sm, m_dl, m_tli, *bb, m_rev_map,
+		      init_regions, gep_map, m_params);
+    v.visit(B);
+    // hook for seahorn
+    has_seahorn_fail |=
+        (v.has_seahorn_fail() && m_func.getName().equals("main"));
 
-		basic_block_t *ret_block = nullptr;
-		var_ref_t ret_val;
-		bool has_seahorn_fail = false;
-		
-		// keep track of initialized regions
-		std::set<Region> init_regions;
-
-		for (auto &B : m_func) {
-			basic_block_t *bb = lookup(B);
-			if (!bb) {
-				continue;
-			}
-
-			//  build a CFG block ignoring branches, phi-nodes, and return
-			CrabInstVisitor v(m_lfac, m_mem, m_sm, m_dl, m_tli, *bb, m_rev_map, init_regions, m_params);
-			v.visit(B);
-		
-			// hook for seahorn
-			has_seahorn_fail |= (v.has_seahorn_fail() && m_func.getName().equals("main"));
-
-			// process the exit block of the function and its returned value.
-			if (ReturnInst *RI = dyn_cast<ReturnInst>(B.getTerminator())) {
-				if (ret_block) {
-					// UnifyFunctionExitNodes ensures *at most* one return instruction per function.
-					CLAM_ERROR("UnifyFunctionExitNodes pass should be run first");
-				}
+    // -- process the exit block of the function and its returned value.
+    if (ReturnInst *RI = dyn_cast<ReturnInst>(B.getTerminator())) {
+      if (ret_block) {
+        // UnifyFunctionExitNodes ensures *at most* one return
+        // instruction per function.
+        CLAM_ERROR("UnifyFunctionExitNodes pass should be run first");
+      }
 
 				ret_block = bb;
 				m_cfg->set_exit(ret_block->label());
@@ -3349,34 +3366,34 @@ namespace clam {
 	
 		return;
 	}
+/* CrabBuilderParams class */
 
-	/* CrabBuilderParams class */
+void CrabBuilderParams::write(raw_ostream &o) const {
+  o << "CFG builder options:\n";
+  o << "\tabstraction level: ";
+  switch (precision_level) {
+  case crab::cfg::PTR:
+    o << "integers and pointers\n";
+    break;
+  case crab::cfg::NUM:
+    o << "only integers\n";
+    break;
+  case crab::cfg::ARR:
+    o << "integers and arrays (memory abstraction)\n";
+    break;
+  default:;
+    ;
+  }
+  o << "\tsimplify cfg: " << simplify << "\n";
+  o << "\tinterproc cfg: " << interprocedural << "\n";
+  o << "\tmemory-ssa cfg: " << memory_ssa << "\n";
+  o << "\tlower singleton aliases into scalars: " << lower_singleton_aliases
+    << "\n";
+  o << "\ttuned translation for array smashing:"  << use_array_smashing << "\n";
+  o << "\tenable big numbers: " << enable_bignums << "\n";
+}
 
-	void CrabBuilderParams::write(raw_ostream &o) const {
-		o << "CFG builder options:\n";
-		o << "\tabstraction level: ";
-		switch (precision_level) {
-			case crab::cfg::PTR:
-				o << "integers and pointers\n";
-				break;
-			case crab::cfg::NUM:
-				o << "only integers\n";
-				break;
-			case crab::cfg::ARR:
-				o << "integers and arrays (memory abstraction)\n";
-				break;
-			default:;
-		}
-		o << "\tsimplify cfg: " << simplify << "\n";
-		o << "\tinterproc cfg: " << interprocedural << "\n";
-		o << "\tmemory-ssa cfg: " << memory_ssa << "\n";
-		o << "\tlower singleton aliases into scalars: " << lower_singleton_aliases << "\n";
-		o << "\tinitialize arrays: " << enabled_array_initialization() << "\n";
-		o << "\tenable possibly unsound initialization of arrays: " << aggressive_initialize_arrays << "\n";
-		o << "\tenable big numbers: " << enable_bignums << "\n";
-	}
-
-	/* CFG Builder class */
+/* CFG Builder class */
 CfgBuilder::CfgBuilder(const llvm::Function &func, CrabBuilderManager &man)
     : m_impl(new CfgBuilderImpl(func, man.get_var_factory(),
                                 man.get_heap_abstraction(),
@@ -3444,7 +3461,7 @@ Optional<CfgBuilder::varset> CfgBuilder::get_live_symbols(const BasicBlock *B) c
   }
 }
 
-	/* CFG Manager class */
+/* CFG Manager class */
 CrabBuilderManager::CrabBuilderManager(CrabBuilderParams params,
                                        const llvm::TargetLibraryInfo &tli,
                                        std::unique_ptr<HeapAbstraction> mem)
