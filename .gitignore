@@ -3,3 +3,4 @@
 /ext/
 .vscode
 dockercp.sh
+.racetrack_changes.cpp
