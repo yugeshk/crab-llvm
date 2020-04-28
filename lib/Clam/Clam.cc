@@ -481,51 +481,51 @@ namespace clam {
       }
     }
 
-	// template<typename AbsDomain>
-	// void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, const LLVMContext &ctx){
-	// 	typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
-	// 	abs_tr_t vis(inv);
-	// 	bb.dump(); //This is the crab basic block
-	// 	for(auto &s: bb){
-	// 		AbsDomain next_inv = std::move(vis.get_abs_value()); //next_inv is the invariant that holds just before executing s
-	// 		if(s.is_clam_print()){
-	// 			// std::stringstream ss;
-	// 			// ss << s.out_stream_buff().rdbuf();
-	// 			// llvm::outs << "Call statement :: " << ss.str() << std::endl;
+	template<typename AbsDomain>
+	void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, const LLVMContext &ctx){
+		typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
+		abs_tr_t vis(inv);
+		bb.dump(); //This is the crab basic block
+		for(auto &s: bb){
+			AbsDomain next_inv = std::move(vis.get_abs_value()); //next_inv is the invariant that holds just before executing s
+			if(s.is_clam_print()){
+				// std::stringstream ss;
+				// ss << s.out_stream_buff().rdbuf();
+				// llvm::outs << "Call statement :: " << ss.str() << std::endl;
 
-	// 			llvm::outs() << "Invariants as linear constraints\n";
-	// 			auto csts = next_inv.to_linear_constraint_system();
-	// 			//Now we print out the linear constraints here
-	// 			csts.dump();
-	// 			llvm::outs() << "\n";
-	// 		}
-	// 		else{
-	// 			s.accept(&vis); //propagate invariant one step forward
-	// 		}
-	// 	}
-	// }
+				llvm::outs() << "Invariants as linear constraints\n";
+				auto csts = next_inv.to_linear_constraint_system();
+				//Now we print out the linear constraints here
+				csts.dump();
+				llvm::outs() << "\n";
+			}
+			else{
+				s.accept(&vis); //propagate invariant one step forward
+			}
+		}
+	}
 
-	// template<typename AbsDomain>
-	// void runClamVarTags(AbsDomain inv, basic_block_t& bb, const LLVMContext &ctx){
-	// 	typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
-	// 	abs_tr_t vis(inv);
-	// 	bb.dump(); //This is the crab basic block where the print_var_tags 
-	// 	for(auto &s: bb){
-	// 		AbsDomain next_inv = std::move(vis.get_abs_value()); //next_inv is the invariant that holds just before executing s
-	// 		if(s.is_clam_var_tags()){ 
-	// 			llvm::outs() << "Invariants projected to certain variables\n";
-	// 			auto &s1 = dynamic_cast<crab::cfg::callsite_stmt<ikos::z_number, llvm_variable_factory::varname_t>&>(s);
-	// 			next_inv.project(s1.get_args());
-	// 			//Now we print out the projected constraints here
-	// 			auto csts = next_inv.to_linear_constraint_system();
-	// 			csts.dump();
-	// 			llvm::outs() << "\n";
-	// 		}
-	// 		else{
-	// 			s.accept(&vis); //propagate invariant one step forward
-	// 		}
-	// 	}
-	// }
+	template<typename AbsDomain>
+	void runClamVarTags(AbsDomain inv, basic_block_t& bb, const LLVMContext &ctx){
+		typedef crab::analyzer::intra_abs_transformer<AbsDomain> abs_tr_t;
+		abs_tr_t vis(inv);
+		bb.dump(); //This is the crab basic block where the print_var_tags 
+		for(auto &s: bb){
+			AbsDomain next_inv = std::move(vis.get_abs_value()); //next_inv is the invariant that holds just before executing s
+			if(s.is_clam_var_tags()){ 
+				llvm::outs() << "Invariants projected to certain variables\n";
+				auto &s1 = dynamic_cast<crab::cfg::callsite_stmt<ikos::z_number, llvm_variable_factory::varname_t>&>(s);
+				next_inv.project(s1.get_args());
+				//Now we print out the projected constraints here
+				auto csts = next_inv.to_linear_constraint_system();
+				csts.dump();
+				llvm::outs() << "\n";
+			}
+			else{
+				s.accept(&vis); //propagate invariant one step forward
+			}
+		}
+	}
     
     bool pathAnalyze(const AnalysisParams& params,
 		     const std::vector<const llvm::BasicBlock*>& blocks,
@@ -718,32 +718,32 @@ namespace clam {
 	CRAB_VERBOSE_IF(1, crab::get_msg_stream() << "Finished assert checking.\n");      
       }
 	
-	// llvm::outs() << "\n********* STARTING CUSTOM ANALYSIS **********\n";
+	llvm::outs() << "\n********* STARTING CUSTOM ANALYSIS **********\n";
 
-	// //After everything is done, we will do out printing business
-	// const Function *F = entry->getParent();
-	// for(const_inst_iterator It = inst_begin(F), E = inst_end(F); It != E; ++It){
-	// 	if(It->getOpcode() == 54){ //This is a call instruction
-	// 		if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_lin_cst"){ //This is our required instruction check
-	// 			const llvm::BasicBlock *llvm_bb = It->getParent();
-	// 			basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
-	// 			auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
-	// 			basic_block_t &bb = get_cfg().get_node(bb_label);
-	// 			Dom inv;
-	// 			runClamPrintFunction(pre, bb, llvm_bb->getContext());
-	// 		}
-	// 		else if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_var_tags"){
-	// 			const llvm::BasicBlock *llvm_bb = It->getParent();
-	// 			basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
-	// 			auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
-	// 			basic_block_t &bb = get_cfg().get_node(bb_label);
-	// 			Dom inv;
-	// 			runClamVarTags(pre, bb, llvm_bb->getContext());
-	// 		}
-	// 	}
-	// }
+	//After everything is done, we will do out printing business
+	const Function *F = entry->getParent();
+	for(const_inst_iterator It = inst_begin(F), E = inst_end(F); It != E; ++It){
+		if(It->getOpcode() == 54){ //This is a call instruction
+			if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_lin_cst"){ //This is our required instruction check
+				const llvm::BasicBlock *llvm_bb = It->getParent();
+				basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
+				auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
+				basic_block_t &bb = get_cfg().get_node(bb_label);
+				Dom inv;
+				runClamPrintFunction(pre, bb, llvm_bb->getContext());
+			}
+			else if(cast<CallInst>(*It).getCalledFunction()->getName() == "__CLAM_print_var_tags"){
+				const llvm::BasicBlock *llvm_bb = It->getParent();
+				basic_block_label_t bb_label = m_cfg_builder->get_crab_basic_block(llvm_bb);
+				auto pre = analyzer.get_pre(bb_label); //pre condition for the entry of basic block
+				basic_block_t &bb = get_cfg().get_node(bb_label);
+				Dom inv;
+				runClamVarTags(pre, bb, llvm_bb->getContext());
+			}
+		}
+	}
 
-	// llvm::outs() << "\n********* ENDING CUSTOM ANALYSIS **********\n";
+	llvm::outs() << "\n********* ENDING CUSTOM ANALYSIS **********\n";
 
       
       return;

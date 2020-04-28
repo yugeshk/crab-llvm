@@ -105,11 +105,11 @@ namespace clam {
     void analyze(AnalysisParams &params, const llvm::BasicBlock *entry,
 		 const lin_csts_map_t &assumptions);
 
-    // template<typename AbsDomain>
-    // void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
+    template<typename AbsDomain>
+    void runClamPrintFunction(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
 
-    // template<typename AbsDomain>
-    // void runClamVarTags(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
+    template<typename AbsDomain>
+    void runClamVarTags(AbsDomain inv, basic_block_t& bb, llvm::LLVMContext &ctx);
     
     /**
      * Compute strongest post-condition of an acyclic path.
