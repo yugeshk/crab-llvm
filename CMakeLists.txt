@@ -177,7 +177,7 @@ if (GIT_FOUND)
       CACHE STRING "llvm-dsa repo")
     set (SEA_DSA_REPO "https://github.com/seahorn/sea-dsa"
       CACHE STRING "sea-dsa repo")
-    set (SEAHORN_LLVM_REPO "https://github.com/seahorn/llvm-seahorn"
+    set (SEAHORN_LLVM_REPO "https://github.com/yugeshk/llvm-seahorn"
       CACHE STRING "seahorn-llvm repo")
 
     add_custom_target (llvm-dsa-git
