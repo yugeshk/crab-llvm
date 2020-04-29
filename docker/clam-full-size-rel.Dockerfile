@@ -14,7 +14,8 @@ FROM seahorn/seahorn-build-llvm5:$UBUNTU
 # Needed to run clang with -m32
 RUN apt-get update && \
     apt-get install -yqq libc6-dev-i386 && \
-    apt-get install -yqq libboost-all-dev
+    apt-get install -yqq libboost-all-dev && \
+    apt-get install -yqq python3-pip nano vim
 
 RUN cd / && git clone https://github.com/antoinemine/apron.git && mkdir -p /apron/install
 WORKDIR /apron
@@ -62,6 +63,22 @@ RUN cmake --build . --target test-readme
 RUN cmake --build . --target test-ssh-simplified
 RUN cmake --build . --target test-ntdrivers-simplified
 
+# Install ERAN
+RUN cd / && git clone https://github.com/ljlin/eran
+WORKDIR /eran
+RUN pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt --timeout 180
+RUN ./install.sh
 
+# Python path for elina python interface
+ENV PYTHONPATH=$PYTHONPATH:/clam/build/crab/elina-prefix/src/elina/python_interface
+
+# test ERAN
+WORKDIR /eran/tf_verify
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/clam/build/run/elina/lib/
+
+#run dynamic linked for shared objects that were possibly not found
+RUN ldconfig -v /clam/build/run/lib /clam/build/run/elina/lib /apron/install/lib /clam/build/run/elina/lib/
+ 
+RUN python3 . --netname ../nets/racetrack-fnn-14-64-64-9_20191121.tf --input_box_cons ../data/race-track/input_box.txt --relation_diagram ./relation.txt --domain deeppoly --dataset race-track
 
 WORKDIR /clam
