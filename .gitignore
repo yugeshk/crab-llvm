@@ -1,3 +1,6 @@
 /build/
 /debug/
 /ext/
+.vscode
+.racetrack_changes.cpp
+dockercp.sh
