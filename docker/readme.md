@@ -1,8 +1,8 @@
 # Building Clam with Docker and running tests
 
 ```shell
-docker build --build-arg UBUNTU=xenial --build-arg BUILD_TYPE=Release -t clam_xenial_rel -f docker/clam-full-size-rel.Dockerfile .
-docker run -v `pwd`:/host -it clam_xenial_rel"
+docker build --build-arg UBUNTU=xenial --build-arg BRANCH=eran --build-arg BUILD_TYPE=Release -t eran_racetrack -f docker/clam-full-size-rel.Dockerfile .
+docker run -v `pwd`:/host -it eran_racetrack"
 ```
 
 This will automatically download all dependencies from a base image

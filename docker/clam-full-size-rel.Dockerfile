@@ -15,7 +15,7 @@ FROM seahorn/seahorn-build-llvm5:$UBUNTU
 RUN apt-get update && \
     apt-get install -yqq libc6-dev-i386 && \
     apt-get install -yqq libboost-all-dev && \
-    apt-get install -yqq python3-pip nano vim
+    apt-get install -yqq python3-pip nano vim protobuf-compiler libprotoc-dev
 
 RUN cd / && git clone https://github.com/antoinemine/apron.git && mkdir -p /apron/install
 WORKDIR /apron
@@ -64,9 +64,9 @@ RUN cmake --build . --target test-ssh-simplified
 RUN cmake --build . --target test-ntdrivers-simplified
 
 # Install ERAN
-RUN cd / && git clone https://github.com/ljlin/eran
+RUN cd / && git clone https://github.com/yugeshk/eran -b racetrack-master
 WORKDIR /eran
-RUN pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt --timeout 180
+RUN pip3 install requirements.txt
 RUN ./install.sh
 
 # Python path for elina python interface
