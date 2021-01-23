@@ -66,7 +66,8 @@ RUN cmake --build . --target test-ntdrivers-simplified
 # Install ERAN
 RUN cd / && git clone https://github.com/yugeshk/eran -b racetrack-master
 WORKDIR /eran
-RUN pip3 install requirements.txt
+RUN pip3 install --upgrade pip
+RUN pip3 install -r requirements.txt
 RUN ./install.sh
 
 # Python path for elina python interface
